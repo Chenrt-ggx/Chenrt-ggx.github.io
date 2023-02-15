@@ -1,0 +1,230 @@
+<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 对编译技术课设的一些经验与反思</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/952d2fb3d8df"><h1>对编译技术课设的一些经验与反思</h1></a><div><div><div><a href="/category/Buaa/1">Buaa</a></div><div><a href="/category/Buaa/Compile/1">Compile</a></div></div></div><div><div><div><a href="/tag/Java/1">Java</a></div><div><a href="/tag/Compiler/1">Compiler</a></div></div></div><div><p>[迁移自博客园] | 6 个性能点排名平均 16，官方排名 5，未实现 SSA IR 和 LLVM IR，仅供参考。</p><span id="more"></span><h2 id="关于实现"><a class="markdownIt-Anchor" href="#关于实现"></a> 关于实现</h2><h3 id="左值特判"><a class="markdownIt-Anchor" href="#左值特判"></a> 左值特判</h3><p>由于赋值语句与表达式语句都可能起始于左值，构造表达式节点时无法确定应采用 <code>LVal '=' Exp</code> 还是 <code>Exp</code> 进行解析，为此有两种处理的方式：</p><ul><li>向前读取，如果先读取到等号，则采用 <code>LVal '=' Exp</code> 的方式解析，如果先读取到分号，则采用 <code>Exp</code> 的方式解析。</li><li>先读取一个左值节点，判断接下来的符号是否是等号，以此确定解析方式，再为 <code>LVal '=' Exp</code> 和 <code>Exp</code> 分别实现一个传入左值节点的构造器。</li></ul><p>第一种方式比较简单，第二种方式可以处理分号缺失异常，个人采用了第二种方式，但实际上无论课上还是课下，都没有遇到支持分号缺失异常的需求。</p><h3 id="函数参数读取"><a class="markdownIt-Anchor" href="#函数参数读取"></a> 函数参数读取</h3><p>一种判断函数参数读取结束的条件是读取到右括号，另一种条件是读取到不属于表达式起始符号集的符号，后者的好处是便于应对括号缺失异常的情况。</p><p>与函数参数读取类似，函数返回值读取也存在同样的问题，读取到不属于表达式起始符号集的符号时认为没有返回值相比于读取到分号时认为没有返回值，可以应对分号缺失的情况。</p><h3 id="错误处理架构"><a class="markdownIt-Anchor" href="#错误处理架构"></a> 错误处理架构</h3><p>一个比较好的实现是在语法分析的时候一边写一边想可能出现的错误，将这些错误发送到错误处理器进行处理。如果这个错误是指导书提到的错误，使用单独实现的 Handler，否则使用默认的 Handler。</p><p>上述设计可以很好的应对增加错误处理的需求，在预判比较详尽的情况下，往往只需要增加一个 Handler 即可完成增加错误处理。</p><h2 id="关于测试"><a class="markdownIt-Anchor" href="#关于测试"></a> 关于测试</h2><h3 id="词法分析"><a class="markdownIt-Anchor" href="#词法分析"></a> 词法分析</h3><p>这部分数据的构造比较简单，只要基于正则表达式随机生成各种 token 并拼接到一起即可。</p><p>这部分的自动化测试同样简单，只要多人对拍寻找差异即可。</p><h3 id="语法分析"><a class="markdownIt-Anchor" href="#语法分析"></a> 语法分析</h3><p>这部分数据的构造比较复杂，一种可能的方案是随机生成抽象语法树并限制层数，同时需要避免抽象语法树上的一些简单语义错误。当然也可以直接白嫖公共测试库，尤其文法没有变化的情况下，还有往届的公共测试库可以用，<s>A 组的 13 是哪个混蛋出的，太毒瘤了吧</s>。</p><p>这部分的自动化测试存在一种巧妙的方法，即为每个语法单元实现一个输出方法，这时候输出整个语法树等价于完成了一次代码格式化工作，我们只要通过 GCC 验证源代码和格式化后的代码行为是否一致即可。个人强烈建议实现语法分析阶段的自动化测试以尽早发现问题，避免将问题留到中间代码甚至代码生成阶段，尤其是在实现了抽象语法树上的窥孔的情况下。</p><h3 id="中间代码"><a class="markdownIt-Anchor" href="#中间代码"></a> 中间代码</h3><p>这部分开始数据的构造十分复杂，一种可能的方案是随机生成抽象语法树并限制层数，同时构造特定的生成模板或策略，避免出现运行时错误，个人认为这个过程的复杂程度远超实现一个编译器本身，因此建议白嫖公共测试库即可。</p><p>这部分的自动化测试比较直白，只要实现一个中间代码的解释器并解释执行源代码进行对拍，当然如果采用了 LLVM IR 则可以考虑省略这一过程，<s>您.ll</s>。</p><h3 id="代码生成"><a class="markdownIt-Anchor" href="#代码生成"></a> 代码生成</h3><p>这部分数据的构造同样十分复杂，原因同上，不再赘述。</p><p>这部分的自动化测试更加直白，生成代码之后放到 Mars 里面跑出来对拍即可，当然也可以考虑内置一个单周期 CPU 仿真器。</p><p>此外，内置一个单周期 CPU 仿真器的情况下，可以实现一个有趣的优化，即解释执行目标代码，维护输出内容、内存和寄存器状态直到遇到第一个输入，此时只要先输出全部缓存的输出内容，预初始化内存，设置寄存器现场，再跳转到第一个输入即可，对于在读入前进行了较多处理的情况，可以提高性能。上述优化个人最后因为精力原因并没有实现，不保证效果，不过感觉可以一试。</p><h2 id="关于优化"><a class="markdownIt-Anchor" href="#关于优化"></a> 关于优化</h2><p>这部分偷个懒，直接搬申优文档。</p><h3 id="前端优化"><a class="markdownIt-Anchor" href="#前端优化"></a> 前端优化</h3><ul><li><p>小型函数内联</p><p>函数内联可以在前端抽象语法树或中端函数调用语句翻译时完成，前者更加简单，但难以更好的获得函数的信息，如函数中存在大量死代码，中端在死代码删除后内联可以直接获取这一信息，前端则无法获取这一信息，从而会取消内联一些本可以内联的函数。</p><p>此外，函数内联会破坏数据流分析，增加基本块，造成全局寄存器分配的效果下降，对于普通四元式的实现，数据流分析并不是很强，可能判定本没有冲突的变量冲突，因此需要将函数内联的阈值进一步减少。使用 SSA IR 会有更强的数据流分析能力，可以支持对更大函数的内联。</p></li><li><p>表达式翻译优化</p><p>前端表达式优化通过在抽象语法树上预计算出表达式的值进行优化，目标是完成中间代码阶段不是很方便完成的工作，例如：</p><ul><li>在中端数据流分析中，难以有效的利用变量值域信息，而在抽象语法树表达式部分的多叉表达式树上则可以将 <code>x &lt; y &lt; 2</code> 直接翻译成 <code>1</code>，减少之后的计算工作。</li><li>在中端数据流分析中，通过传播可以简单的将 <code>x + 1 + 2</code> 优化成 <code>x + 3</code>，但不方便将 <code>1 + x + 2</code> 优化成 <code>x + 3</code>，前端表达式翻译可以针对这些情况特判。</li></ul></li><li><p>局部常数数组全局化</p><p>此优化可以方便的直接在抽象语法树上完成，由于不需要每次进入函数时对数组进行初始化，对涉及多次调用尤其是递归调用的函数性能提升是巨大的，不过由于缺乏数据流信息，难以识别出表面上是非常数数组，但实际上是常数数组的局部数组。</p><p>在此优化的基础上，可以更进一步的识别出只被初始化一次，且初始化的内容可以在编译阶段被确定的数组，将这些数组直接计算出来作为全局常数数组使用，可以进一步提升性能，但需要更多的过程间数据流分析的支持，较难实现。</p></li><li><p>循环翻译优化</p><p>这个优化比较显然，通过将 <code>while</code> 循环翻译成 <code>do-while</code> 的形式，可以将原本的 <code>2n</code> 次的跳转优化为 <code>n + 1</code> 次的跳转，且在不考虑代码长度的情况下没有副作用。</p></li><li><p>数组寻址运算强度削弱</p><p>数组寻址过程中，可能涉及针对地址的乘除法运算，这些运算放到后端进行乘除法优化，就会因为失去了最后得到的地址是非负的这一信息，引入更多的指令，在前端还存在这一信息时，可以在中间代码中引入位运算，通过将对地址的操作翻译成中间代码中的位运算这一方式，将其传递到后端提升性能。</p></li></ul><h3 id="中端优化"><a class="markdownIt-Anchor" href="#中端优化"></a> 中端优化</h3><ul><li><p>常量传播</p><p>基于到达定义分析即可实现的简单全局优化，本身并不会对性能造成很大的影响，但结合死代码删除对中间代码质量和性能的提升是显著的，易错点是对于全局变量的特判。</p><p>此外，对于结果为常数的指令也可以进行传播，此处需全面考虑各种情况，在源操作数均为常数的基础上，对于乘法有乘零传播，对于除法有零除传播，更进一步的，通过获取变量的“到达值域”信息，可以对以逻辑判断为主的计算类中间代码做更多常量传播优化。</p></li><li><p>复写传播</p><p>基于到达定义分析即可实现的简单全局优化，本身并不会对性能造成很大的影响，但结合死代码删除对中间代码质量和性能的提升是显著的，易错点是对于全局变量的特判。</p><p>此外，简单的复写传播难以处理循环时 <code>i = i + 1</code> 的情况，这是因为翻译出的 <code>t = i, t = t + 1, i = t</code> 会被传播为 <code>t = i + 1, i = t</code>，由于 <code>i</code> 的到达定义包括初始化和上一次循环，此时优化会停止，但实际上这是可以进行优化的，为此可进行窥孔，而更优雅的方式是使用 SSA IR 和 GVN 等更强的数据流分析与优化。</p></li><li><p>死代码删除</p><p>基于活跃变量分析即可实现的简单全局优化，对中间代码质量和性能的提升是显著的，易错点是对于全局变量的特判，一种简单的处理是不删除对全局变量的赋值操作，这样的代价是无法删除一些本可以删除的全局变量。</p><p>对上述问题，一种“治标不治本”的策略是，将只出现在一个函数的全局变量局部化，这里额外存在递归函数的坑点，需要进行特别处理，同样的，更优雅的处理方式是使用 SSA IR 和 GVN 等更强的数据流分析与优化。</p></li><li><p>分支语句窥孔优化</p><p>此优化比较显然，即在抽象语法树翻译阶段我们只使用了非零跳转这一个分支语句，对应于 MIPS 体系结构中的 <code>bne $reg, $zero, TAG</code>，这显然是不利于提高性能的，尤其对于不提供 <code>sle</code> 指令而只提供 <code>slt</code> 指令的 MIPS 体系结构，<code>x &lt;= 0</code> 会被翻译为 <code>sle</code> 接 <code>bnz</code> 的中间代码，再被翻译成的目标代码的执行开销很大，可以将其优化成 MIPS 体系结构中的 <code>blez $reg, TAG</code>。</p><p>在 MIPS 体系结构中，可以用于此优化的跳转指令包括 <code>bne, beq, bgez, bgtz, blez, bltz</code> 六个，需要分别进行判断，尽可能多的替换成此类指令进行优化。</p></li><li><p>全局变量初始化优化</p><p>此优化主要基于在编译课设中，使用 <code>.data</code> 在 Mars 中初始化不计入指令条数，实现此优化的一种方式是在抽象语法树上完成计算，翻译出带 <code>.data</code> 的结果，但这样可能不利于灵活的开关此优化，也可能不利于统一使用 Global Pointer 加偏移量的形式访问全局变量以提升性能。</p><p>为此，个人采用的策略是在中间代码阶段直接解释执行进入主函数之前的内容，从而获得完整的全局内存空间的初始化内容，以此进行 <code>.data</code> 部分的初始化。</p></li></ul><h3 id="后端优化"><a class="markdownIt-Anchor" href="#后端优化"></a> 后端优化</h3><ul><li><p>立即数乘除法优化</p><p>这个优化难度不高，对于乘法，只需要搜索可以使用少量位运算计算乘法的立即数，分别估计这些立即数直接做乘法和使用位运算代替乘法的代价，选择较小的即可，对于除法和取模，只需要按照论文实现出来即可。</p><p>此外，个人认为设置除法极长的执行时间是不合理的，既然存在上述固定位数立即数除法的优化，完全可以将其实现在硬件上，如果乘法需要五个时钟周期，按照上述算法优化的除法只要十周期左右，通过除法极大的时钟周期逼同学做乘除法优化意义不大，建议参考计组的周期设置。</p><blockquote><p>勘误：“完全可以将其实现在硬件上”是有问题的，因为除转乘的 magic number 是算出来的而不是固定的，不可能在板子上算 magic number，硬除法只能嗯除（不过除法的代价确实大的太离谱了）。感谢潘老师指出。</p></blockquote></li><li><p>OPT 临时寄存器分配</p><p>对于临时寄存器，其分配单位是基本块，指令执行顺序是确定的，因此采用 OPT 策略进行分配，对于此算法的实现，一般存在暴力扫描和平衡树查找两种实现方式，<s>不会还有人在用 LRU 这种垃圾策略吧，不会吧不会吧</s>。</p><p>暴力扫描即直接向后寻找下一次使用，由于很大的基本块不是很多的情况使用这种方式足矣，更具有一般性且对大量大型基本块友好的方式是使用平衡树优化，即对每个变量建立一颗平衡树维护其使用位置信息，通过平衡树节点维护子树大小，可以在对数时间内完成查询后继，有更好的性能。</p><p>此外需要特别注意，只有被更新的临时寄存器溢出或刷新时才需要写回，否则无需写回。</p></li><li><p>图着色全局寄存器分配</p><p>图着色分配全局寄存器的关键在于冲突图的构造和溢出的选择，冲突图的构造方面，对于每个基本块需要先将基本块的 in 集合两两连接，再从后向前扫描，维护 out 集合的同时，将每条语句全部的 def 与此时 out 集合中全部的变量连接。</p><p>溢出方面，个人采用 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>∑</mo><msup><mn>2</mn><mi>i</mi></msup><mi mathvariant="normal">/</mi><mi>j</mi></mrow><annotation encoding="application/x-tex">\sum2^i/j</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.074674em;vertical-align:-0.25001em;"></span><span class="mop op-symbol small-op" style="position:relative;top:-0.0000050000000000050004em;">∑</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.824664em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span></span></span></span></span><span class="mord">/</span><span class="mord mathnormal" style="margin-right:0.05724em;">j</span></span></span></span> 计算权重，其中 i 表示循环深度，j 表示节点度数，优先将权重小的变量溢出，此处可以采用二叉堆在对数时间高效的实现。</p><p>此外，寄存器分配的单位是函数，对于不同类型的函数可以采用不同的寄存器分配比例和分配条件，例如：</p><ul><li>对于基本块多而小的控制密集型函数，需要尽可能多的分配全局寄存器，此时开启对于函数参数的着色，只保留少量临时寄存器而将尽可能多的寄存器用于着色。</li><li>对于基本块少而大的计算密集型函数，需要尽可能多的分配临时寄存器，不同于图着色的启发式，OPT 策略是理论最优，可以最大程度提升性能，此外在这种情况下函数参数的重要性下降，可取消对于函数参数的着色，只留出少量全局寄存器用于控制，其它寄存器全部设置为临时寄存器。</li></ul></li><li><p>后端无用跳转语句删除</p><p>此优化比较显然，如果一条无条件跳转语句跳转的目标为其下一条语句，可以直接删除此跳转语句，需要注意的是，如果此跳转语句后有多个标签跟随，需要依次扫描判断是否相同，否则可能会漏掉一些可以删除的情况。</p><p>此外还有一种情况是，一条跳转语句（无论有没有条件）的目标是一个无条件跳转语句，此时可以将第一条跳转的目标设置为第二条无条件跳转的目标，这个窥孔个人忘记做了，<s>问就是像 OO 化简做了和差角公式忘了诱导公式一样后悔</s>。</p></li><li><p>后端无用赋值语句删除</p><p>此优化比较显然，如果存在多条相同的 <code>lw</code> 语句或 <code>sw</code> 语句可只保留一个，如果存在相同的 <code>lw</code> 语句接 <code>sw</code> 语句，可以删除 <code>sw</code> 语句而只保留 <code>lw</code> 语句，此窥孔优化需要保证控制流不存在分支，因此需要对跨 TAG 的情况进行特别处理。</p></li></ul><h2 id="杂项补遗"><a class="markdownIt-Anchor" href="#杂项补遗"></a> 杂项补遗</h2><h3 id="hack-评测机"><a class="markdownIt-Anchor" href="#hack-评测机"></a> Hack 评测机</h3><p>注意到 pcode 的存在，且评测机没有要求同学选择按照 pcode 还是 MIPS 进行评测，大胆猜测评测机没有对提交是否为 pcode 进行运行前区分，<s>下面的测试来自某不愿透露姓名的毕昇杯一等奖奆佬</s>。</p><p>实现一个同时支持 pcode 和代码生成的编译器，以毫秒做种随机选择表现为 pcode 还是 MIPS，提交评测可以得到下面的结果：</p><img src="/assets/images/compile-hack.jpg" width="50%"><p>注：此处不用秒做种是因为评测机会在几乎同一时间启动多个 Docker 进行评测，使用秒做种难以达到很好的随机效果。</p><p>由于同时支持了 pcode 和 MIPS 评测，每个测试点不会使用多组输入测试 MIPS 代码，即 MIPS 代码的输出是确定的，又因为评测机支持 pcode 评测导致编译器可以获得测试点的 stdin，编译器完全可以读取 stdin，解释执行源代码，将结果缓存并在 MIPS 代码中直接输出，性能直接逆天。</p><p>免责声明：上述内容针对 19 级使用的评测机，对其它评测机不保证有效，<s>此外真 Hack 评测机出事了笔者可不管（逃）</s>。</p><h3 id="乘除法优化测试"><a class="markdownIt-Anchor" href="#乘除法优化测试"></a> 乘除法优化测试</h3><p>其实还就是计组里面测试 ALU 指令的那一套东西，只不过从汇编变成了高级语言，一个参考的测试生成工具如下，白嫖万岁。</p><pre class="highlight"><code class="java"><span class="hljs-keyword">import</span> java.util.List;
+<span class="hljs-keyword">import</span> java.util.Random;
+<span class="hljs-keyword">import</span> javafx.util.Pair;
+<span class="hljs-keyword">import</span> java.util.HashMap;
+<span class="hljs-keyword">import</span> java.util.ArrayList;
+<span class="hljs-keyword">import</span> java.math.BigInteger;
+<span class="hljs-keyword">import</span> java.util.LinkedList;
+<span class="hljs-keyword">import</span> java.util.Collections;
+
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> &#123;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">MulExtract</span> &#123;
+        <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> <span class="hljs-type">int</span> steps;
+        <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> <span class="hljs-type">int</span> source;
+        <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> ArrayList&lt;Pair&lt;Boolean, Integer&gt;&gt; items;
+
+        <span class="hljs-keyword">private</span> <span class="hljs-title function_">MulExtract</span><span class="hljs-params">(<span class="hljs-type">int</span>... values)</span> &#123;
+            <span class="hljs-type">int</span> <span class="hljs-variable">optimizeValue</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>;
+            items = <span class="hljs-keyword">new</span> <span class="hljs-title class_">ArrayList</span>&lt;&gt;();
+            <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> i : values) &#123;
+                <span class="hljs-keyword">if</span> (i &gt;= <span class="hljs-number">0</span>) &#123;
+                    optimizeValue += <span class="hljs-number">1</span> &lt;&lt; i;
+                    items.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Pair</span>&lt;&gt;(<span class="hljs-literal">true</span>, i &amp; Integer.MAX_VALUE));
+                &#125;
+                <span class="hljs-keyword">else</span> &#123;
+                    optimizeValue -= <span class="hljs-number">1</span> &lt;&lt; (i &amp; Integer.MAX_VALUE);
+                    items.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Pair</span>&lt;&gt;(<span class="hljs-literal">false</span>, i &amp; Integer.MAX_VALUE));
+                &#125;
+            &#125;
+            source = optimizeValue;
+            <span class="hljs-type">int</span> <span class="hljs-variable">count</span> <span class="hljs-operator">=</span> items.get(<span class="hljs-number">0</span>).getKey() || items.get(<span class="hljs-number">0</span>).getValue() == <span class="hljs-number">0</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">2</span>;
+            <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">1</span>; i &lt; items.size(); i++) &#123;
+                <span class="hljs-keyword">if</span> (items.get(i).getValue() != <span class="hljs-number">0</span>) &#123;
+                    count++;
+                &#125;
+                count++;
+            &#125;
+            steps = count;
+        &#125;
+
+        <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> <span class="hljs-title function_">getSteps</span><span class="hljs-params">()</span> &#123;
+            <span class="hljs-keyword">return</span> steps;
+        &#125;
+
+        <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> <span class="hljs-title function_">getSource</span><span class="hljs-params">()</span> &#123;
+            <span class="hljs-keyword">return</span> source;
+        &#125;
+
+        <span class="hljs-keyword">private</span> ArrayList&lt;Pair&lt;Boolean, Integer&gt;&gt; <span class="hljs-title function_">getItems</span><span class="hljs-params">()</span> &#123;
+            <span class="hljs-keyword">return</span> items;
+        &#125;
+
+        <span class="hljs-keyword">private</span> <span class="hljs-type">boolean</span> <span class="hljs-title function_">isBetter</span><span class="hljs-params">()</span> &#123;
+            <span class="hljs-type">int</span> <span class="hljs-variable">base</span> <span class="hljs-operator">=</span> <span class="hljs-number">6</span>;
+            <span class="hljs-keyword">if</span> ((source &amp; <span class="hljs-number">0xffff</span>) == <span class="hljs-number">0</span> || (Short.MIN_VALUE &lt;= source
+                    &amp;&amp; source &lt;= Short.MAX_VALUE - Short.MIN_VALUE)) &#123;
+                base--;
+            &#125;
+            <span class="hljs-keyword">return</span> steps &lt; base;
+        &#125;
+
+        <span class="hljs-meta">@Override</span>
+        <span class="hljs-keyword">public</span> String <span class="hljs-title function_">toString</span><span class="hljs-params">()</span> &#123;
+            <span class="hljs-type">StringBuilder</span> <span class="hljs-variable">builder</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">StringBuilder</span>(<span class="hljs-string">&quot;x * &quot;</span> + source + <span class="hljs-string">&quot; = &quot;</span>);
+            <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; items.size(); i++) &#123;
+                <span class="hljs-keyword">if</span> (i != <span class="hljs-number">0</span> || !items.get(i).getKey()) &#123;
+                    builder.append(items.get(i).getKey() ? <span class="hljs-string">&quot;+ &quot;</span> : <span class="hljs-string">&quot;- &quot;</span>);
+                &#125;
+                <span class="hljs-keyword">if</span> (items.get(i).getValue() == <span class="hljs-number">0</span>) &#123;
+                    builder.append(<span class="hljs-string">&quot;x &quot;</span>);
+                &#125;
+                <span class="hljs-keyword">else</span> &#123;
+                    builder.append(<span class="hljs-string">&quot;(x &lt;&lt; &quot;</span>).append(items.get(i).getValue()).append(<span class="hljs-string">&quot;) &quot;</span>);
+                &#125;
+            &#125;
+            <span class="hljs-keyword">return</span> builder.append(<span class="hljs-string">&quot;-&gt; &quot;</span>).append(steps).toString();
+        &#125;
+    &#125;
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-type">int</span> shPosition;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-type">int</span> leftOneBit;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-type">long</span> magicValue;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">final</span> HashMap&lt;Integer, MulExtract&gt; mulOptMap;
+
+    <span class="hljs-keyword">static</span> &#123;
+        LinkedList&lt;MulExtract&gt; sourceList = <span class="hljs-keyword">new</span> <span class="hljs-title class_">LinkedList</span>&lt;&gt;();
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">32</span>; i++) &#123;
+            sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i));
+            sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i | <span class="hljs-number">0x80000000</span>));
+            <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">j</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; j &lt; <span class="hljs-number">32</span>; j++) &#123;
+                sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i, j));
+                sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i, j | <span class="hljs-number">0x80000000</span>));
+                sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i | <span class="hljs-number">0x80000000</span>, j));
+                sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i | <span class="hljs-number">0x80000000</span>, j | <span class="hljs-number">0x80000000</span>));
+                <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">k</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; k &lt; <span class="hljs-number">32</span>; k++) &#123;
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i, j, k));
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i, j, k | <span class="hljs-number">0x80000000</span>));
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i, j | <span class="hljs-number">0x80000000</span>, k));
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i, j | <span class="hljs-number">0x80000000</span>, k | <span class="hljs-number">0x80000000</span>));
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i | <span class="hljs-number">0x80000000</span>, j, k));
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i | <span class="hljs-number">0x80000000</span>, j, k | <span class="hljs-number">0x80000000</span>));
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i | <span class="hljs-number">0x80000000</span>, j | <span class="hljs-number">0x80000000</span>, k));
+                    sourceList.add(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MulExtract</span>(i | <span class="hljs-number">0x80000000</span>, j | <span class="hljs-number">0x80000000</span>, k | <span class="hljs-number">0x80000000</span>));
+                &#125;
+            &#125;
+        &#125;
+        mulOptMap = <span class="hljs-keyword">new</span> <span class="hljs-title class_">HashMap</span>&lt;&gt;();
+        sourceList.stream().filter(MulExtract::isBetter).forEach(i -&gt; &#123;
+            <span class="hljs-keyword">if</span> (!mulOptMap.containsKey(i.getSource()) || i.getSteps() &lt;
+                    mulOptMap.get(i.getSource()).getSteps()) &#123;
+                mulOptMap.put(i.getSource(), i);
+            &#125;
+        &#125;);
+    &#125;
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">getMagicNumber</span><span class="hljs-params">(BigInteger divImm)</span> &#123;
+        leftOneBit = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">while</span> (divImm.compareTo(BigInteger.valueOf(<span class="hljs-number">1</span>).shiftLeft(leftOneBit)) &gt; <span class="hljs-number">0</span>) &#123;
+            leftOneBit++;
+        &#125;
+        shPosition = leftOneBit;
+        <span class="hljs-type">long</span> <span class="hljs-variable">lowValue</span> <span class="hljs-operator">=</span> BigInteger.valueOf(<span class="hljs-number">1</span>).shiftLeft(<span class="hljs-number">32</span> + leftOneBit).divide(divImm).longValue();
+        <span class="hljs-type">long</span> <span class="hljs-variable">highValue</span> <span class="hljs-operator">=</span> BigInteger.valueOf(<span class="hljs-number">1</span>).shiftLeft(<span class="hljs-number">32</span> + leftOneBit).add(BigInteger.valueOf(<span class="hljs-number">1</span>)
+                .shiftLeft(<span class="hljs-number">1</span> + leftOneBit)).divide(divImm).longValue();
+        <span class="hljs-keyword">while</span> (highValue &gt;&gt; <span class="hljs-number">1</span> &gt; lowValue &gt;&gt; <span class="hljs-number">1</span> &amp;&amp; shPosition &gt; <span class="hljs-number">0</span>) &#123;
+            highValue &gt;&gt;= <span class="hljs-number">1</span>;
+            lowValue &gt;&gt;= <span class="hljs-number">1</span>;
+            shPosition--;
+        &#125;
+        magicValue = highValue;
+    &#125;
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">testMul</span><span class="hljs-params">(<span class="hljs-type">int</span> n, <span class="hljs-type">int</span> m)</span> &#123;
+        <span class="hljs-keyword">if</span> (mulOptMap.containsKey(m)) &#123;
+            <span class="hljs-type">int</span> <span class="hljs-variable">result</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">for</span> (Pair&lt;Boolean, Integer&gt; i : mulOptMap.get(m).getItems()) &#123;
+                <span class="hljs-keyword">if</span> (i.getKey()) &#123;
+                    result += n &lt;&lt; i.getValue();
+                &#125;
+                <span class="hljs-keyword">else</span> &#123;
+                    result -= n &lt;&lt; i.getValue();
+                &#125;
+            &#125;
+            <span class="hljs-keyword">if</span> (result != n * m) &#123;
+                System.out.println(<span class="hljs-string">&quot;wrong at n = &quot;</span> + n + <span class="hljs-string">&quot;, m = &quot;</span> + m);
+                System.out.println(<span class="hljs-string">&quot;ans = &quot;</span> + (n * m) + <span class="hljs-string">&quot;, result = &quot;</span> + result);
+            &#125;
+        &#125;
+    &#125;
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">testDiv</span><span class="hljs-params">(<span class="hljs-type">int</span> n, <span class="hljs-type">int</span> d)</span> &#123;
+        <span class="hljs-keyword">if</span> (d != <span class="hljs-number">0</span>) &#123;
+            <span class="hljs-type">int</span> result;
+            getMagicNumber(BigInteger.valueOf(d).abs());
+            <span class="hljs-keyword">if</span> (Math.abs(d) == <span class="hljs-number">1</span>) &#123;
+                result = n;
+            &#125;
+            <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (Integer.bitCount(Math.abs(d)) == <span class="hljs-number">1</span>) &#123;
+                result = (n + (n &gt;&gt; (leftOneBit - <span class="hljs-number">1</span>) &gt;&gt;&gt; (<span class="hljs-number">32</span> - leftOneBit))) &gt;&gt; leftOneBit;
+            &#125;
+            <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (magicValue &lt; Integer.MAX_VALUE) &#123;
+                <span class="hljs-type">long</span> <span class="hljs-variable">mul</span> <span class="hljs-operator">=</span> (magicValue * (<span class="hljs-type">long</span>)n) &gt;&gt; <span class="hljs-number">32</span> &amp; <span class="hljs-number">0xffffffffL</span>;
+                result = ((<span class="hljs-type">int</span>)mul &gt;&gt; shPosition) + (n &lt; <span class="hljs-number">0</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>);
+            &#125;
+            <span class="hljs-keyword">else</span> &#123;
+                <span class="hljs-type">long</span> <span class="hljs-variable">mul</span> <span class="hljs-operator">=</span> ((magicValue - (<span class="hljs-number">1L</span> &lt;&lt; <span class="hljs-number">32</span>)) * (<span class="hljs-type">long</span>)n) &gt;&gt; <span class="hljs-number">32</span> &amp; <span class="hljs-number">0xffffffffL</span>;
+                result = ((n + (<span class="hljs-type">int</span>)mul) &gt;&gt; shPosition) + (n &lt; <span class="hljs-number">0</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>);
+            &#125;
+            result = d &lt; <span class="hljs-number">0</span> ? -result : result;
+            <span class="hljs-keyword">if</span> (result != n / d) &#123;
+                System.out.println(<span class="hljs-string">&quot;wrong at n = &quot;</span> + n + <span class="hljs-string">&quot;, d = &quot;</span> + d);
+                System.out.println(<span class="hljs-string">&quot;ans = &quot;</span> + (n / d) + <span class="hljs-string">&quot;, result = &quot;</span> + result);
+            &#125;
+        &#125;
+    &#125;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> &#123;
+        ArrayList&lt;Integer&gt; testImm = <span class="hljs-keyword">new</span> <span class="hljs-title class_">ArrayList</span>&lt;&gt;();
+        List&lt;Integer&gt; randMul = <span class="hljs-keyword">new</span> <span class="hljs-title class_">ArrayList</span>&lt;&gt;(mulOptMap.keySet());
+        Collections.shuffle(randMul);
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> -<span class="hljs-number">8</span>; i &lt;= <span class="hljs-number">8</span>; i++) &#123;
+            testImm.add(i);
+        &#125;
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">5</span>; i++) &#123;
+            testImm.add(Integer.MAX_VALUE - i);
+            testImm.add(Integer.MIN_VALUE + i);
+        &#125;
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">32</span>; i++) &#123;
+            testImm.add(<span class="hljs-number">1</span> &lt;&lt; i);
+            testImm.add(~(<span class="hljs-number">1</span> &lt;&lt; i));
+        &#125;
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">21</span>; i++) &#123;
+            testImm.add(<span class="hljs-number">1</span> &lt;&lt; ((<span class="hljs-keyword">new</span> <span class="hljs-title class_">Random</span>()).nextInt() &amp; <span class="hljs-number">31</span>)
+                    | <span class="hljs-number">1</span> &lt;&lt; ((<span class="hljs-keyword">new</span> <span class="hljs-title class_">Random</span>()).nextInt() &amp; <span class="hljs-number">31</span>));
+            testImm.add(~(<span class="hljs-number">1</span> &lt;&lt; ((<span class="hljs-keyword">new</span> <span class="hljs-title class_">Random</span>()).nextInt() &amp; <span class="hljs-number">31</span>))
+                    &amp; ~(<span class="hljs-number">1</span> &lt;&lt; ((<span class="hljs-keyword">new</span> <span class="hljs-title class_">Random</span>()).nextInt() &amp; <span class="hljs-number">31</span>)));
+        &#125;
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">29</span>; i++) &#123;
+            testImm.add((<span class="hljs-keyword">new</span> <span class="hljs-title class_">Random</span>()).nextInt());
+            testImm.add((<span class="hljs-keyword">new</span> <span class="hljs-title class_">Random</span>()).nextInt() &gt;&gt; <span class="hljs-number">16</span>);
+            testImm.add((<span class="hljs-keyword">new</span> <span class="hljs-title class_">Random</span>()).nextInt() &gt;&gt; <span class="hljs-number">24</span>);
+        &#125;
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">80</span>; i++) &#123;
+            testImm.add(randMul.get(i));
+        &#125;
+        testImm.forEach(i -&gt; testImm.forEach(j -&gt; &#123;
+            testMul(i, j);
+            testDiv(i, j);
+        &#125;));
+        System.out.println(<span class="hljs-string">&quot;int data[&quot;</span> + testImm.size() + <span class="hljs-string">&quot;] = &#123;&quot;</span>);
+        testImm.forEach(i -&gt; System.out.println(<span class="hljs-string">&quot;\t&quot;</span> + i + <span class="hljs-string">&quot;,&quot;</span>));
+        System.out.println(<span class="hljs-string">&quot;&#125;;\n&quot;</span>);
+        System.out.println(<span class="hljs-string">&quot;int main() &#123;&quot;</span>);
+        System.out.println(<span class="hljs-string">&quot;\tint i = 0, n = &quot;</span> + testImm.size() + <span class="hljs-string">&quot;;&quot;</span>);
+        System.out.println(<span class="hljs-string">&quot;\twhile (i &lt; n) &#123;&quot;</span>);
+        testImm.forEach(i -&gt; &#123;
+            System.out.println(<span class="hljs-string">&quot;\t\tprintf(\&quot;%d * &quot;</span> + i + <span class="hljs-string">&quot; = %d\\n\&quot;, data[i], &quot;</span>
+                + i + <span class="hljs-string">&quot;, data[i] * &quot;</span> + i + <span class="hljs-string">&quot;);&quot;</span>);
+            <span class="hljs-keyword">if</span> (i != <span class="hljs-number">0</span>) &#123;
+                System.out.println(<span class="hljs-string">&quot;\t\tprintf(\&quot;%d / &quot;</span> + i + <span class="hljs-string">&quot; = %d\\n\&quot;, data[i], &quot;</span>
+                    + i + <span class="hljs-string">&quot;, data[i] / &quot;</span> + i + <span class="hljs-string">&quot;);&quot;</span>);
+                System.out.println(<span class="hljs-string">&quot;\t\tprintf(\&quot;%d % &quot;</span> + i + <span class="hljs-string">&quot; = %d\\n\&quot;, data[i], &quot;</span>
+                    + i + <span class="hljs-string">&quot;, data[i] % &quot;</span> + i + <span class="hljs-string">&quot;);&quot;</span>);
+            &#125;
+            System.out.println();
+        &#125;);
+        System.out.println(<span class="hljs-string">&quot;\t\ti = i + 1;\n\t&#125;&quot;</span>);
+        System.out.println(<span class="hljs-string">&quot;\treturn 0;\n&#125;&quot;</span>);
+    &#125;
+&#125;
+</code></pre><h3 id="参考代码仓库"><a class="markdownIt-Anchor" href="#参考代码仓库"></a> 参考代码仓库</h3><ul><li><a href="https://github.com/Chenrt-ggx/MipsCompiler">YuGe-Compiler</a>，笔者的编译器，附赠课程文档及完整公共测试库。</li><li><a href="https://github.com/refkxh/BUAA_Compiler_2020Fall">BUAA_Compiler_2020Fall</a>，孔佬的编译器，设计中间代码的时候参考了其中间代码部分（剩下几个都是 SSA IR，当时没打算做），需要注意的是，19 级之前的文法和 19 级之后的文法差别较大。</li><li><a href="https://github.com/Forever518/Whitee">Whitee</a>，基于 C++ 的 2020 毕昇杯二等奖编译器，手写的递归下降，个人写递归下降的时候参考了其前端的设计。</li><li><a href="https://github.com/No-SF-Work/ayame">ayame</a>，基于 Java 的 2020 毕昇杯一等奖编译器，前端是自动化生成的，个人写乘除法优化和中端/后端窥孔的时候参考了其设计。</li><li><a href="https://github.com/gyp2847399255/SysY-compiler">SysY-compiler</a>，郭佬的编译器，基于 C++，只做了一个 GVN 好几个点就吊打笔者了。</li><li><a href="https://github.com/Coekjan/MIPSysY-Compiler">MIPSysY-Compiler</a>，叶佬的编译器，基于 Java，和笔者一样没实现 SSA IR，性能和笔者各有优劣。</li></ul></div><div>Word count: 6.1k</div><div>Reading time: 24min</div><div><div><a href="/archive/2022/09/1">Created 2022-09-08T05:05:56.000Z</a></div></div><div><div><a href="/archive/2022/09/1">Last Modified 2022-09-08T05:05:56.000Z</a></div></div><div><br><br></div></div></content><div><br></div><footer>Copyright © 2022-2023 Chenrt Blog</footer></noscript><div id="app"></div></body></html>
