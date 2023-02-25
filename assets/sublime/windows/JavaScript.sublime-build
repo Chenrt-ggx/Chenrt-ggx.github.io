@@ -1,0 +1,15 @@
+{
+  "encoding": "utf-8",
+  "working_dir": "$file_path",
+  "selector": "source.js",
+  "variants": [
+    {
+      "name": "Run",
+      "shell_cmd": "node $file"
+    },
+    {
+      "name": "RunInCmd",
+      "shell_cmd": "start cmd /c \"node $file & pause\""
+    }
+  ]
+}

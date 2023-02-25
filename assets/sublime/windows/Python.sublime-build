@@ -1,0 +1,15 @@
+{
+  "encoding": "utf-8",
+  "working_dir": "$file_path",
+  "selector": "source.python",
+  "variants": [
+    {
+      "name": "Run",
+      "shell_cmd": "python -u $file"
+    },
+    {
+      "name": "RunInCmd",
+      "shell_cmd": "start cmd /c \"python -u $file & pause\""
+    }
+  ]
+}

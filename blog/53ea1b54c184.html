@@ -13,7 +13,7 @@
   event.<span class="hljs-title function_">preventDefault</span>();
   <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
 &#125;);
-</code></pre></li></ul><h2 id="trigbreak妨碍分析过程"><a class="markdownIt-Anchor" href="#trigbreak妨碍分析过程"></a> TrigBreak（妨碍分析过程）</h2><ul><li><p>工作原理</p><p>通过 <code>debugger</code> 语句可在 JS 中自动下断点；通过 <code>setInterval</code> 高频执行包含 <code>debugger</code> 语句的函数即可阻止用户下断点调试。</p></li><li><p>应对方式</p><p>在 DevTools 里停用断点可禁用所有断点；在 DevTools 里 <code>debugger</code> 语句所在的行号右键可禁用这一行的断点（一些毒瘤的变种会持续创造包含<code>debugger</code> 语句的匿名函数并执行，导致这种方法失效）；此外也可以使用支持去掉 <code>debugger</code> 语句的浏览器扩展或本地 mitmproxy 一下把响应里干坏事的代码去掉。</p></li><li><p>参考代码</p><p>下面的代码是一个简单的实现：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">function</span> <span class="hljs-title function_">debug</span>(<span class="hljs-params"></span>) &#123;
+</code></pre></li></ul><h2 id="trigbreak妨碍分析过程"><a class="markdownIt-Anchor" href="#trigbreak妨碍分析过程"></a> TrigBreak（妨碍分析过程）</h2><ul><li><p>工作原理</p><p>通过 <code>debugger</code> 语句可在 JS 中自动下断点；通过 <code>setInterval</code> 高频执行包含 <code>debugger</code> 语句的函数即可阻止用户下断点调试。</p></li><li><p>应对方式</p><p>在 DevTools 里停用断点可禁用所有断点；在 DevTools 里 <code>debugger</code> 语句所在的行号右键可禁用这一行的断点（一些毒瘤的变种会持续创造包含 <code>debugger</code> 语句的匿名函数并执行，导致这种方法失效）；此外也可以使用支持去掉 <code>debugger</code> 语句的浏览器扩展或本地 mitmproxy 一下把响应里干坏事的代码去掉。</p></li><li><p>参考代码</p><p>下面的代码是一个简单的实现：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">function</span> <span class="hljs-title function_">debug</span>(<span class="hljs-params"></span>) &#123;
   <span class="hljs-keyword">debugger</span>;
   <span class="hljs-built_in">setTimeout</span>(debug, <span class="hljs-number">1</span>);
 &#125;

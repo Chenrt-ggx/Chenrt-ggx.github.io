@@ -1,0 +1,16 @@
+{
+  "encoding": "cp936",
+  "working_dir": "$file_path",
+  "file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$",
+  "selector": "source.java",
+  "variants": [
+    {
+      "name": "Run",
+      "shell_cmd": "javac $file -encoding utf-8 && java $file_base_name"
+    },
+    {
+      "name": "Run In Terminal",
+      "shell_cmd": "konsole -e bash -c \"javac $file -encoding utf-8; java $file_base_name; read -p 'Process Exit, Press any key to quit...'\""
+    }
+  ]
+}
