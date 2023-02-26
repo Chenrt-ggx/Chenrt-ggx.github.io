@@ -1,0 +1,530 @@
+<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 对网易云性格主导色算法的简要分析</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/3fbed5fdfb7d"><h1>对网易云性格主导色算法的简要分析</h1></a><div><div><div><a href="/category/Misc/1">Misc</a></div></div></div><div><div><div><a href="/tag/JavaScript/1">JavaScript</a></div><div><a href="/tag/Reverse/1">Reverse</a></div></div></div><div><p>[迁移自博客园] | 在客户端完成计算，共有 16 种可能的结果，结果存在随机性。</p><span id="more"></span><h2 id="测试过程"><a class="markdownIt-Anchor" href="#测试过程"></a> 测试过程</h2><p>多次选择固定选项并观察结果，发现存在结果不同的情况，具体的，笔者全部选择位于屏幕最上方的选项，发现答案可能是橙绿或蓝粉，且蓝粉几率较大（从代码分析来看，蓝粉几率较大似乎是笔者的错觉）。</p><h3 id="抓包测试"><a class="markdownIt-Anchor" href="#抓包测试"></a> 抓包测试</h3><p>初始化完成后，采用 Fiddler 进行请求拦截，发现不需要联网就可以做完全部题目（但图片和音频无法加载），直到获取结果时无法继续。获取结果时，存在两个必须的 POST 请求 weblog 和 antispam，均发送了未知的字符串，但诡异之处在于返回值并不是测试结果：</p><blockquote><p>迁博客时注：antispam 已改名 nickname，可以望文生义了。</p></blockquote><img src="/assets/images/test/wyy-color/pic-1.jpg"><h3 id="network-分析"><a class="markdownIt-Anchor" href="#network-分析"></a> Network 分析</h3><p>通过 Network 对 antispam 进行分析（weblog 同理，不过因为其意义可以望文生义，就偷懒不分析了），如下图所示，既然加密在前端进行，我们就有机会找出被加密前的内容：</p><img src="/assets/images/test/wyy-color/pic-2.jpg"><p>搜索字符串 encSecKey，可以找到下图所示的代码段，对相关代码打断点后单步调试，分析发现传输的只是姓名（那么意义应该是敏感词检测，<s>不信填点不能说的东西进去试试</s>）：</p><img src="/assets/images/test/wyy-color/pic-3.jpg"> <img src="/assets/images/test/wyy-color/pic-4.jpg"><p>由上述内容可知，我们的选择没有被上传，结果在客户端完成计算，为此可以从 click 事件出发，找到以下 JavaScript：</p><blockquote><p>迁博客时注：其实对于中文客户端计算的测试，抓个包分析一下确认测试信息不是通过 API 得到的之后，直接在 JavaScript 里面搜关键字（中文）是最快的。</p></blockquote><img src="/assets/images/test/wyy-color/pic-5.jpg"> <img src="/assets/images/test/wyy-color/pic-6.jpg"><h2 id="算法解析"><a class="markdownIt-Anchor" href="#算法解析"></a> 算法解析</h2><h3 id="频数统计"><a class="markdownIt-Anchor" href="#频数统计"></a> 频数统计</h3><p>对每一题的每个选项打若干颜色标签（如下），根据前七题选择的选项对应的颜色标签列表统计颜色频数：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> p = [
+  [
+    [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>],
+    [<span class="hljs-string">&#x27;紫&#x27;</span>, <span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>],
+    [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;蓝&#x27;</span>]
+  ],
+  [
+    [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+    [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>],
+    [<span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>]
+  ],
+  [
+    [<span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>],
+    [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>],
+    [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>]
+  ],
+  [
+    [<span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>],
+    [<span class="hljs-string">&#x27;紫&#x27;</span>, <span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>],
+    [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;蓝&#x27;</span>]
+  ],
+  [
+    [<span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+    [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>],
+    [<span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;蓝&#x27;</span>]
+  ],
+  [
+    [<span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>, <span class="hljs-string">&#x27;银&#x27;</span>],
+    [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>],
+    [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>]
+  ],
+  [
+    [<span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+    [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>],
+    [<span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;蓝&#x27;</span>]
+  ],
+  [
+    [<span class="hljs-string">&#x27;紫&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;银&#x27;</span>],
+    [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>]
+  ]
+];
+</code></pre><p>以第一题选择 A 为例，其标签是 <code>['金', '绿']</code>，如果选择了第一题 A 选项，那么金绿两个颜色的频数分别加一：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">var</span> t = e.<span class="hljs-property">length</span>;
+<span class="hljs-keyword">var</span> i = &#123;&#125;;
+e.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, t - <span class="hljs-number">1</span>).<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e, t</span>) &#123;
+  <span class="hljs-keyword">return</span> <span class="hljs-title function_">v</span>(i, e, t);
+&#125;);
+</code></pre><p>其中 e 是选项 id 数组，<code>e.slice(0, t - 1)</code> 实现了对数组除最后一项的拷贝，v 函数如下，其参数 t 是传入的字典 i，参数 e 和 n 分别为选项下标和题号：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">function</span> <span class="hljs-title function_">v</span>(<span class="hljs-params">t, e, n</span>) &#123;
+  p[n][e - <span class="hljs-number">1</span>].<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+    t[e] = t[e] ? t[e] + <span class="hljs-number">1</span> : <span class="hljs-number">1</span>;
+  &#125;);
+&#125;
+</code></pre><h3 id="频数转换"><a class="markdownIt-Anchor" href="#频数转换"></a> 频数转换</h3><p>将从颜色到频数的映射转换为从频数到颜色的映射，如果存在重复，随机保留一个（此处没有显式的随机，而是在保留遍历 dict 时最后遍历的结果时，由 dict 的无序性引入了随机）：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">var</span> n = i;
+<span class="hljs-keyword">var</span> r = !<span class="hljs-number">1</span>;
+<span class="hljs-keyword">var</span> o = &#123;&#125;;
+
+<span class="hljs-title class_">Object</span>.<span class="hljs-title function_">keys</span>(n).<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+  <span class="hljs-keyword">var</span> t = n[e];
+  <span class="hljs-keyword">if</span> (o[t]) &#123;
+    r = !<span class="hljs-number">0</span>;
+    o[t] = e;
+  &#125;
+  <span class="hljs-comment">// ......</span>
+&#125;);
+</code></pre><p>如果遇到了频数重复，额外更新第八题对应颜色的频数：</p><pre class="highlight"><code class="js">r &amp;&amp; <span class="hljs-title function_">v</span>(i, e[t - <span class="hljs-number">1</span>], t - <span class="hljs-number">1</span>);
+</code></pre><h3 id="生成结果"><a class="markdownIt-Anchor" href="#生成结果"></a> 生成结果</h3><p>上面的代码全部以逗号表达式的形式存在于一个 if 的条件中，条件以 <code>2 !== e[7]</code> 结束。由逗号表达式的性质，最终决定执行哪一分支的是第八题的结果。</p><ul><li><p>考虑第八题结果，如果选 A 则最终结果为双色，具体过程如下：</p><p>遍历下表并寻找两元素频数和最大的项，将两元素拼接作为结果：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> m = [
+  [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;金&#x27;</span>],
+  [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>],
+  [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+  [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;蓝&#x27;</span>],
+  [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+  [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>],
+  [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>],
+  [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>],
+  [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>]
+];
+</code></pre><p>表内的项有两个元素，形如 <code>['粉', '金']</code>，频数和通过传入一个函数定义奖励值的方式计算：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> a = <span class="hljs-title function_">N</span>(m, <span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+  <span class="hljs-keyword">return</span> i[e[<span class="hljs-number">0</span>]] + i[e[<span class="hljs-number">1</span>]];
+&#125;).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+</code></pre><p>被调用的 N 函数如下，选择奖励值即项内两元素频数和最大者：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">function</span> <span class="hljs-title function_">N</span>(<span class="hljs-params">e, n</span>) &#123;
+  <span class="hljs-keyword">var</span> r;
+  <span class="hljs-keyword">var</span> o = -<span class="hljs-number">1</span>;
+  <span class="hljs-keyword">return</span> (
+    e.<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e, t</span>) &#123;
+      e = <span class="hljs-title function_">n</span>(e);
+      o &lt; e &amp;&amp; ((o = e), (r = t));
+    &#125;),
+    e[r]
+  );
+&#125;
+</code></pre><p>如果得到的结果是橙绿，有 0.5 的几率变为蓝粉：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;橙绿&#x27;</span> === a &amp;&amp; <span class="hljs-number">0.5</span> &lt; <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">random</span>() &amp;&amp; (a = <span class="hljs-string">&#x27;蓝粉&#x27;</span>), a;
+</code></pre></li><li><p>考虑第八题结果，如果选 B 则最终结果为单色，具体过程如下：</p><p>遍历下表寻找频数最大的项，将其直接作为结果：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> h = [<span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>, <span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>];
+</code></pre><p>表内的项有一个元素，形如 <code>'绿'</code>，频数和依然通过传入一个函数定义奖励值的方式计算：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">var</span> a = <span class="hljs-title function_">N</span>(h, <span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+  <span class="hljs-keyword">return</span> i[e];
+&#125;);
+</code></pre><p>被调用的 N 函数同上，如果得到的结果是绿，有 0.5 的几率变为蓝：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;绿&#x27;</span> === a &amp;&amp; <span class="hljs-number">0.5</span> &lt; <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">random</span>() &amp;&amp; (a = <span class="hljs-string">&#x27;蓝&#x27;</span>), a;
+</code></pre></li></ul><p>算法最终返回一个字符串，作为完整结果 dict 的 key 使用，详见完整结果列表部分。</p><h3 id="完整代码"><a class="markdownIt-Anchor" href="#完整代码"></a> 完整代码</h3><p>经过了格式化及阳间化，如需查看原始代码，可在开发者工具中搜索任意看起来顺眼的颜色（中文）并在搜索结果附近寻找。</p><pre class="highlight"><code class="js"><span class="hljs-keyword">function</span> <span class="hljs-title function_">y</span>(<span class="hljs-params">e</span>) &#123;
+  <span class="hljs-keyword">var</span> t = e.<span class="hljs-property">length</span>;
+  <span class="hljs-keyword">var</span> i = &#123;&#125;;
+  e.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, t - <span class="hljs-number">1</span>).<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e, t</span>) &#123;
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">v</span>(i, e, t);
+  &#125;);
+  <span class="hljs-keyword">var</span> n = i;
+  <span class="hljs-keyword">var</span> r = !<span class="hljs-number">1</span>;
+  <span class="hljs-keyword">var</span> o = &#123;&#125;;
+  <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">keys</span>(n).<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+    <span class="hljs-keyword">var</span> t = n[e];
+    o[t] &amp;&amp; (r = !<span class="hljs-number">0</span>), (o[t] = e);
+  &#125;);
+  r &amp;&amp; <span class="hljs-title function_">v</span>(i, e[t - <span class="hljs-number">1</span>], t - <span class="hljs-number">1</span>);
+  <span class="hljs-keyword">if</span> (<span class="hljs-number">2</span> !== e[<span class="hljs-number">7</span>]) &#123;
+    <span class="hljs-keyword">var</span> a = <span class="hljs-title function_">N</span>(m, <span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+      <span class="hljs-keyword">return</span> i[e[<span class="hljs-number">0</span>]] + i[e[<span class="hljs-number">1</span>]];
+    &#125;).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;橙绿&#x27;</span> === a &amp;&amp; <span class="hljs-number">0.5</span> &lt; <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">random</span>() &amp;&amp; (a = <span class="hljs-string">&#x27;蓝粉&#x27;</span>), a;
+  &#125; <span class="hljs-keyword">else</span> &#123;
+    <span class="hljs-keyword">var</span> a = <span class="hljs-title function_">N</span>(h, <span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+      <span class="hljs-keyword">return</span> i[e];
+    &#125;);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;绿&#x27;</span> === a &amp;&amp; <span class="hljs-number">0.5</span> &lt; <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">random</span>() &amp;&amp; (a = <span class="hljs-string">&#x27;蓝&#x27;</span>), a;
+  &#125;
+&#125;
+</code></pre><h2 id="完整结果列表"><a class="markdownIt-Anchor" href="#完整结果列表"></a> 完整结果列表</h2><p>经过了格式化，省略了不必要的字段。</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  蓝: &#123;
+    <span class="hljs-attr">singleName</span>: <span class="hljs-string">&#x27;天空蓝&#x27;</span>,
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;20.03&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">5</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;蓝&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在蓝色的人拥有大局观和战略思维！&#x27;</span>,
+      <span class="hljs-string">&#x27;你向外界舒适地展示着自我，在规则世界中自在穿行！&#x27;</span>,
+      <span class="hljs-string">&#x27;蓝色的人聪明有灵气，总能轻易得到大家的欣赏和支持！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;蓝&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;极端的蓝色，是非常少见的组合！&#x27;</span>,
+      <span class="hljs-string">&#x27;你最强大的力量在于感知，洞察和直觉！&#x27;</span>,
+      <span class="hljs-string">&#x27;蓝色以其深邃灵魂和智慧，带给自己和他人幸运和奇迹！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;魅力超凡的艺术家&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;橙粉&#x27;</span>, <span class="hljs-string">&#x27;粉金&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;银&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&quot;Mia &amp; Sebastian&#x27;s Theme&quot;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;冷静、睿智、纵览全局&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;感性、浪漫、以人为本&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;2.47&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  金: &#123;
+    <span class="hljs-attr">singleName</span>: <span class="hljs-string">&#x27;闪耀金&#x27;</span>,
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;26.46&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">4</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;金&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在金色的人，是领导者的代名词。&#x27;</span>,
+      <span class="hljs-string">&#x27;在复杂的问题面前，金色总能够迅速掌握全局。&#x27;</span>,
+      <span class="hljs-string">&#x27;金色的人永远在努力，永远可靠，永远帮得上忙！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;金&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;极端金色是极具天赋、极其罕见的组合！&#x27;</span>,
+      <span class="hljs-string">&#x27;他们有能力让混乱和崩溃的事情重回正轨。&#x27;</span>,
+      <span class="hljs-string">&#x27;虽然你处事低调沉稳，但你总是人群中的焦点。&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;夏日初升的太阳&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;粉紫&#x27;</span>, <span class="hljs-string">&#x27;金橙&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;橙粉&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;building a family &#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;领导力、正义、勤奋&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;勇气、无私、责任心&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;3.04&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  橙: &#123;
+    <span class="hljs-attr">singleName</span>: <span class="hljs-string">&#x27;活力橙&#x27;</span>,
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;51.86&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">2</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;橙&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在橙色的人 是高能量的乐观主义者！&#x27;</span>,
+      <span class="hljs-string">&#x27;橙色的人天生聪明，有才能，有资源！&#x27;</span>,
+      <span class="hljs-string">&#x27;你自带元气，可以在复杂世界里闯荡得游刃有余！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;橙&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;极致橙色的气质是世间少有的！&#x27;</span>,
+      <span class="hljs-string">&#x27;行动是橙色的核心，你对想做的事情有无限的驱动力！&#x27;</span>,
+      <span class="hljs-string">&#x27;你是个百分百的生活冒险家，也总能获得命运的偏爱！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;云隙射下的阳光&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;金绿&#x27;</span>, <span class="hljs-string">&#x27;粉&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;金蓝&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;warm zephyr&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;热忱、高能量、有朝气&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;有趣、温暖、幸福&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;4.33&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  绿: &#123;
+    <span class="hljs-attr">singleName</span>: <span class="hljs-string">&#x27;森林绿&#x27;</span>,
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;19.89&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">5</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;绿&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在绿色的人浑身散发着知性的优雅！&#x27;</span>,
+      <span class="hljs-string">&#x27;你自在地穿梭在知识的海洋中，有很强的领悟能力！&#x27;</span>,
+      <span class="hljs-string">&#x27;绿色善于思考，经常提出惊艳全场的新观点！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;绿&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;极端绿色的人是非常少见的！&#x27;</span>,
+      <span class="hljs-string">&#x27;只有极端绿色的人才能在危机中保持清醒，解决问题！&#x27;</span>,
+      <span class="hljs-string">&#x27;绿色是最有安全感的颜色，大家都在寻找极端绿色当伙伴！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;智慧非凡的开拓者&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;蓝粉&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;粉金&#x27;</span>, <span class="hljs-string">&#x27;金蓝&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;夏末的心愿&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;冷静、独立、有逻辑&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;清醒、舒适、包容&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;3.92&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  银: &#123;
+    <span class="hljs-attr">singleName</span>: <span class="hljs-string">&#x27;太空银&#x27;</span>,
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;33.71&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">3</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;银&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在银色的人，身上有与生俱来的高贵气质！&#x27;</span>,
+      <span class="hljs-string">&#x27;你举手投足间优雅大方，自带闪亮光环！&#x27;</span>,
+      <span class="hljs-string">&#x27;银色的人品味很高，不断为自己和他人的生活提升质感！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;银&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;极端的银色是极其罕见的！&#x27;</span>,
+      <span class="hljs-string">&#x27;你优雅克制的背后，有着很强的洞察和创造力！&#x27;</span>,
+      <span class="hljs-string">&#x27;极端银色是宇宙的礼物，你的心中自有星辰与月光！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;漫步银河的梦想家&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;金橙&#x27;</span>, <span class="hljs-string">&#x27;橙绿&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;橙粉&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;Cornfield Chase&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;高贵、优雅、有质感&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;洞察、创造力、有天赋&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;4.53&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  粉: &#123;
+    <span class="hljs-attr">singleName</span>: <span class="hljs-string">&#x27;玫瑰粉&#x27;</span>,
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;59.26&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">2</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;粉&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在粉色的人内心纯粹而温暖！&#x27;</span>,
+      <span class="hljs-string">&#x27;你简单而敏锐，世间美好都逃不过你的眼睛！&#x27;</span>,
+      <span class="hljs-string">&#x27;你用单纯、体贴、无条件的爱，让世界明亮起来！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;粉&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;极端粉色的人群是极其罕见的！&#x27;</span>,
+      <span class="hljs-string">&#x27;你纯洁有信念，拥有所有颜色中最神奇的治愈能力！&#x27;</span>,
+      <span class="hljs-string">&#x27;其他颜色忙于操纵结果，但奇迹往往发生在极端粉色中！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;世间美好收藏家&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;金蓝&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;金绿&#x27;</span>, <span class="hljs-string">&#x27;金橙&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;和煦的糖果风&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;单纯、体贴、温暖&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;纯粹、柔和、治愈&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;2.57&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  紫: &#123;
+    <span class="hljs-attr">singleName</span>: <span class="hljs-string">&#x27;梦幻紫&#x27;</span>,
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;31.56&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">3</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;紫&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在紫色的人气场神秘而梦幻！&#x27;</span>,
+      <span class="hljs-string">&#x27;你通常很精致，而且风格多变、难以捉摸！&#x27;</span>,
+      <span class="hljs-string">&#x27;紫色的人仿佛被命运偏爱，有着令人嫉妒的艺术天赋！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;紫&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;极端的紫色相当少见！ &#x27;</span>,
+      <span class="hljs-string">&#x27;你与浪漫的气质撞个满怀，是人群之中最耀眼的存在！&#x27;</span>,
+      <span class="hljs-string">&#x27;极端紫色的人从不循规蹈矩，能将创造力发挥到极致！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;浪漫的神秘主义者&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;粉金&#x27;</span>, <span class="hljs-string">&#x27;粉紫&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;金紫&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;under the stars&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;神秘、优雅、耀眼&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;浪漫、克制、梦幻&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;4.14&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  金蓝: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;22.45&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">4</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;金&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在的金色百分百努力，是一路前行的奋斗家！&#x27;</span>,
+      <span class="hljs-string">&#x27;你有很高的预设目标，以不断突破为行为准则！&#x27;</span>,
+      <span class="hljs-string">&#x27;金色的人永远在努力，永远可靠，永远帮得上忙！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;蓝&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在蓝色是真正属于智者的灵魂！&#x27;</span>,
+      <span class="hljs-string">&#x27;你最强大的力量在于感知，洞察和直觉！&#x27;</span>,
+      <span class="hljs-string">&#x27;蓝色以其深邃灵魂和智慧，带给自己和他人幸运和奇迹！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;夜空中的璀璨星海&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;橙绿&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;绿&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;Historiette #5&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;领导力、正义、勤奋&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;感性、浪漫、以人为本&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;2.93&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  金橙: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;37.46&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">3</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;金&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在金色的人是天生的领导者！&#x27;</span>,
+      <span class="hljs-string">&#x27;你总能在危机中保持镇静的头脑，带领大家前进！&#x27;</span>,
+      <span class="hljs-string">&#x27;认真威严的金色有时候会有距离感，但责任感超强！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;橙&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在橙色的人，专业严肃的背后藏着一颗童心！&#x27;</span>,
+      <span class="hljs-string">&#x27;你看起来一丝不苟，内心却燃烧着活力和创新的能量！&#x27;</span>,
+      <span class="hljs-string">&#x27;橙色的人具备超乎常人的胆识，是行动力最强的颜色！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;黎明闪耀的霞光&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;银&#x27;</span>, <span class="hljs-string">&#x27;金蓝&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;蓝粉&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;被时光移动的城市&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;领导力、正义、勤奋&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;有趣、温暖、幸福&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;3.92&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  金绿: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;17.44&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">5</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;金&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在金色的人，有一点工作狂倾向！&#x27;</span>,
+      <span class="hljs-string">&#x27;你能保证规则的顺利运行，是值得信赖的同事和朋友！&#x27;</span>,
+      <span class="hljs-string">&#x27;金色的人注重细节，浑身散发着可靠的魅力和高级质感！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;绿&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在绿色的人，少年气永不过期！&#x27;</span>,
+      <span class="hljs-string">&#x27;你充满热爱且勇于追求理想，纯粹的让人妒忌！&#x27;</span>,
+      <span class="hljs-string">&#x27;绿色的人生活既有灵性的深度，又有世俗的成功！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;充满远见的哲学家&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;橙&#x27;</span>, <span class="hljs-string">&#x27;金紫&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;粉&#x27;</span>, <span class="hljs-string">&#x27;蓝粉&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;leaves in the wind&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;领导力、正义、勤奋&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;清醒、舒适、包容&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;2.29&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  橙粉: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;41.59&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">2</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;橙&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在橙色的人，是高能量的乐观主义者！&#x27;</span>,
+      <span class="hljs-string">&#x27;你能为团队带来惊奇的贡献！是人群中的聚光灯！&#x27;</span>,
+      <span class="hljs-string">&#x27;橙色的人被充沛的精力包围，你的无限活力令人惊叹！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;粉&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在粉色的人，心思敏感而柔软！&#x27;</span>,
+      <span class="hljs-string">&#x27;无限活力的背后，细腻和安静是你对待世界的另一面！&#x27;</span>,
+      <span class="hljs-string">&#x27;粉色在体察浪漫上有独家天赋，是最温柔善良的颜色！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;海平面初升的阳光&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;橙绿&#x27;</span>, <span class="hljs-string">&#x27;蓝粉&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;银&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;lazy afternoon&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;热忱、高能量、有朝气&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;纯粹、柔和、治愈&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;3.6&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  蓝粉: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;59.99&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">2</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;蓝&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在蓝色的人，注定要扮演引领全局角色！&#x27;</span>,
+      <span class="hljs-string">&#x27;你向外界舒适地展示着自我，慷慨地向同伴提供支持！&#x27;</span>,
+      <span class="hljs-string">&#x27;蓝色的人眼光长远，总能用实力书写成功和美好！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;粉&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在粉色的人，眼睛里充满温柔气息！&#x27;</span>,
+      <span class="hljs-string">&#x27;你对待他人和自我都很贴心，容易让人感受到温暖！&#x27;</span>,
+      <span class="hljs-string">&#x27;虽然你一路披荆斩棘，但不影响你成为一个仁慈善良的人！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;天边透亮的星&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;橙粉&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;金橙&#x27;</span>, <span class="hljs-string">&#x27;金绿&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;13 jours en France / Piano Solo&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;冷静、睿智、纵览全局&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;纯粹、柔和、治愈&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;2.56&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  粉金: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;34.61&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">3</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;粉&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在粉色的人，举手投足是温柔！&#x27;</span>,
+      <span class="hljs-string">&#x27;你善于发现大自然的美好，是浪漫和氛围感的化身！&#x27;</span>,
+      <span class="hljs-string">&#x27;粉色的人充满关切，不断向周围人散播着温暖与爱！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;金&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在金色的人，是与生俱来的带头人！&#x27;</span>,
+      <span class="hljs-string">&#x27;你关注细节与规则，有一点完美主义，努力且高产！&#x27;</span>,
+      <span class="hljs-string">&#x27;内在金色的人已臻成熟，内外统整，能成为自己生命主宰！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;绚丽夺目的晚霞&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;蓝&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;金紫&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;遇晴&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;单纯、体贴、温暖&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;勇气、无私、责任心&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;2.43&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  粉紫: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;51.78&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">2</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;粉&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在粉色的人善于倾听，浑身散发着治愈的能量！&#x27;</span>,
+      <span class="hljs-string">&#x27;你待人诚恳，与你共处的时光让人觉得心旷神怡！&#x27;</span>,
+      <span class="hljs-string">&#x27;粉色的人共情力很强，很少有你不能理解的立场和观点！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;紫&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在紫色的人，是最神秘难以捉摸的颜色！&#x27;</span>,
+      <span class="hljs-string">&#x27;思想深邃的你，最强大的力量在于感知，洞察和直觉！&#x27;</span>,
+      <span class="hljs-string">&#x27;紫色的人就是魔法师，往往能实现不可思议的愿望！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;神秘温柔的疗愈师&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;紫&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;橙绿&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;dane street&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;单纯、体贴、温暖&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;浪漫、克制、梦幻&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;3.13&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  橙绿: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;26.57&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">4</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;橙&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;外在橙色的人，是高能量的乐观主义者！&#x27;</span>,
+      <span class="hljs-string">&#x27;你能为团队带来惊奇的贡献！是人群中的聚光灯！&#x27;</span>,
+      <span class="hljs-string">&#x27;橙色的人被充沛的精力包围，你的无限活力令人惊叹！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;绿&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在绿色的人拥有真正智者的灵魂，逻辑至上！&#x27;</span>,
+      <span class="hljs-string">&#x27;绿色是最机敏聪慧的颜色，热爱思考，有真知灼见！&#x27;</span>,
+      <span class="hljs-string">&#x27;你善于解决问题并不断创造新的观点，总是令人振奋！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;绚烂而璀璨的极光&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;金&#x27;</span>, <span class="hljs-string">&#x27;银&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;粉紫&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;Belonging&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;热忱、高能量、有朝气&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;清醒、舒适、包容&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;2.88&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> map = &#123;
+  金紫: &#123;
+    <span class="hljs-attr">percent</span>: <span class="hljs-string">&#x27;33.67&#x27;</span>,
+    <span class="hljs-attr">peoplecount</span>: <span class="hljs-number">3</span>,
+    <span class="hljs-attr">otherPeople</span>: <span class="hljs-string">&#x27;金&#x27;</span>,
+    <span class="hljs-attr">otherPeopleText</span>: [
+      <span class="hljs-string">&#x27;金色是所有颜色中最值得信赖的！&#x27;</span>,
+      <span class="hljs-string">&#x27;你有着奢侈品般的高标准，自己就是自己的品牌！&#x27;</span>,
+      <span class="hljs-string">&#x27;金色的人认真可靠，拜托你的事情可以安心等待好消息！&#x27;</span>
+    ],
+    <span class="hljs-attr">infact</span>: <span class="hljs-string">&#x27;紫&#x27;</span>,
+    <span class="hljs-attr">infactText</span>: [
+      <span class="hljs-string">&#x27;内在紫色的人，拥有浑然天成的洞察力和浪漫基因！&#x27;</span>,
+      <span class="hljs-string">&#x27;你仿佛被命运偏爱，有着令人嫉妒的艺术天赋！&#x27;</span>,
+      <span class="hljs-string">&#x27;紫色的人就是魔法师，总能实现不可思议的愿望！&#x27;</span>
+    ],
+    <span class="hljs-attr">oneWord</span>: <span class="hljs-string">&#x27;流光溢彩的钻石&#x27;</span>,
+    <span class="hljs-attr">attracted</span>: [<span class="hljs-string">&#x27;绿&#x27;</span>, <span class="hljs-string">&#x27;金绿&#x27;</span>],
+    <span class="hljs-attr">keepAway</span>: [<span class="hljs-string">&#x27;紫&#x27;</span>, <span class="hljs-string">&#x27;粉金&#x27;</span>],
+    <span class="hljs-attr">songName</span>: <span class="hljs-string">&#x27;バラのように咲く&#x27;</span>,
+    <span class="hljs-attr">keywordOther</span>: <span class="hljs-string">&#x27;领导力、正义、勤奋&#x27;</span>,
+    <span class="hljs-attr">keywordInfact</span>: <span class="hljs-string">&#x27;浪漫、克制、梦幻&#x27;</span>,
+    <span class="hljs-attr">percentGlobal</span>: <span class="hljs-string">&#x27;4.26&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><h2 id="补遗与结语"><a class="markdownIt-Anchor" href="#补遗与结语"></a> 补遗与结语</h2><p>网易云性格主导色测试<a href="https://st.music.163.com/st-color-quiz">传送门</a>在此，其会区分 PC 端和移动端，仅移动端可正常访问。区分 PC 端和移动端的唯一依据是 User Agent，与屏幕分辨率无关。如需要在 PC 端访问，可点击页面中的 Play 或直接在 URL 中传入参数 <code>preview=true</code>。</p><p>在性格主导色算法方面，只能说大师不愧是大师，构造的算法凭借精妙的随机让一般人叹为观止，可以将准确与随机“完美”的结合：</p><img src="/assets/images/test/wyy-color/end.jpg" width="30%"><p>我想，这位“大师”一定深谙概率图灵机，对蒙特卡洛算法、Treap 和 Miller-Rabin 测试等成果都有不错的理解吧。让我们心怀敬仰的写出如下代码，结束本文：</p><pre class="highlight"><code class="c++"><span class="hljs-function">std::mt19937 <span class="hljs-title">generator</span><span class="hljs-params">(<span class="hljs-number">0x114514</span>)</span></span>;
+</code></pre></div><div>Word count: 5.3k</div><div>Reading time: 22min</div><div><div><a href="/archive/2021/05/1">Created 2021-05-27T03:13:26.000Z</a></div></div><div><div><a href="/archive/2021/05/1">Last Modified 2021-05-27T03:13:26.000Z</a></div></div><div><br><br></div></div></content><div><br></div><footer>Copyright © 2021-2023 Chenrt Blog</footer></noscript><div id="app"></div></body></html>

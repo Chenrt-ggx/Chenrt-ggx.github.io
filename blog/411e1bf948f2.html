@@ -1,0 +1,1192 @@
+<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 对网易云哲学性格测试的分析与 Q & A</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/411e1bf948f2"><h1>对网易云哲学性格测试的分析与 Q & A</h1></a><div><div><div><a href="/category/Misc/1">Misc</a></div></div></div><div><div><div><a href="/tag/JavaScript/1">JavaScript</a></div><div><a href="/tag/Reverse/1">Reverse</a></div></div></div><div><p>[迁移自博客园] | 在客户端完成计算，共有 16 种可能的结果，居然没有敏感词检测。</p><span id="more"></span><h2 id="前情提要"><a class="markdownIt-Anchor" href="#前情提要"></a> 前情提要</h2><blockquote><p>Q: 网易云哲学性格测试是个啥？</p></blockquote><p>是网易云的又一个沙雕小测试，依旧是做题写名字给结果的套路，在 APP 里面搜哲学可以搜到，也可以通过直链访问，<a href="https://sg.music.163.com/philosophy/story/analysis">传送门在此</a>。</p><p>鉴权方面，这个测试不会进行登录上的验证，但会区分 PC 端和移动端，若发现通过 PC 端访问，则提示需要在移动端打开。区分 PC 端和移动端的唯一依据是 User Agent，与屏幕分辨率无关。</p><h2 id="题目设置"><a class="markdownIt-Anchor" href="#题目设置"></a> 题目设置</h2><blockquote><p>Q: 这个测试都有哪些题目？</p></blockquote><p>查看代码可知，共 6 + 1 题，无分支剧情，前 6 题的结构化表示如下：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> question2 = &#123;
+  <span class="hljs-attr">seq</span>: <span class="hljs-string">&#x27;1/6&#x27;</span>,
+  <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;这幅画面让你感受到了&#x27;</span>,
+  <span class="hljs-title class_">AName</span>: <span class="hljs-string">&#x27;A.太阳和月亮&#x27;</span>,
+  <span class="hljs-title class_">BName</span>: <span class="hljs-string">&#x27;B.快乐和悲伤&#x27;</span>,
+  <span class="hljs-attr">A</span>: <span class="hljs-string">&#x27;rationality&#x27;</span>,
+  <span class="hljs-attr">B</span>: <span class="hljs-string">&#x27;perception&#x27;</span>
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> question3 = &#123;
+  <span class="hljs-attr">seq</span>: <span class="hljs-string">&#x27;2/6&#x27;</span>,
+  <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;悲剧和喜剧，哪个更深刻&#x27;</span>,
+  <span class="hljs-title class_">AName</span>: <span class="hljs-string">&#x27;A.喜剧&#x27;</span>,
+  <span class="hljs-title class_">BName</span>: <span class="hljs-string">&#x27;B.悲剧&#x27;</span>,
+  <span class="hljs-attr">A</span>: <span class="hljs-string">&#x27;comic&#x27;</span>,
+  <span class="hljs-attr">B</span>: <span class="hljs-string">&#x27;tragic&#x27;</span>
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> question4 = &#123;
+  <span class="hljs-attr">seq</span>: <span class="hljs-string">&#x27;3/6&#x27;</span>,
+  <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;好人和坏人，谁更幸福&#x27;</span>,
+  <span class="hljs-title class_">AName</span>: <span class="hljs-string">&#x27;A.好人&#x27;</span>,
+  <span class="hljs-title class_">BName</span>: <span class="hljs-string">&#x27;B.坏人&#x27;</span>,
+  <span class="hljs-attr">A</span>: <span class="hljs-string">&#x27;comic&#x27;</span>,
+  <span class="hljs-attr">B</span>: <span class="hljs-string">&#x27;tragic&#x27;</span>
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> question5 = &#123;
+  <span class="hljs-attr">seq</span>: <span class="hljs-string">&#x27;4/6&#x27;</span>,
+  <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你是可以替代的人吗&#x27;</span>,
+  <span class="hljs-title class_">AName</span>: <span class="hljs-string">&#x27;A.是的&#x27;</span>,
+  <span class="hljs-title class_">BName</span>: <span class="hljs-string">&#x27;B.不是&#x27;</span>,
+  <span class="hljs-attr">A</span>: <span class="hljs-string">&#x27;tragic&#x27;</span>,
+  <span class="hljs-attr">B</span>: <span class="hljs-string">&#x27;comic&#x27;</span>
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> question6 = &#123;
+  <span class="hljs-attr">seq</span>: <span class="hljs-string">&#x27;5/6&#x27;</span>,
+  <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;如果一件事情你没有看见，那么是否发生了&#x27;</span>,
+  <span class="hljs-title class_">AName</span>: <span class="hljs-string">&#x27;A.发生了&#x27;</span>,
+  <span class="hljs-title class_">BName</span>: <span class="hljs-string">&#x27;B.没发生&#x27;</span>,
+  <span class="hljs-attr">A</span>: <span class="hljs-string">&#x27;rationality&#x27;</span>,
+  <span class="hljs-attr">B</span>: <span class="hljs-string">&#x27;perception&#x27;</span>
+&#125;;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> question7 = &#123;
+  <span class="hljs-attr">seq</span>: <span class="hljs-string">&#x27;6/6&#x27;</span>,
+  <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;这段音乐在讲述什么&#x27;</span>,
+  <span class="hljs-title class_">AName</span>: <span class="hljs-string">&#x27;A.人生&#x27;</span>,
+  <span class="hljs-title class_">BName</span>: <span class="hljs-string">&#x27;B.时光&#x27;</span>,
+  <span class="hljs-attr">A</span>: <span class="hljs-string">&#x27;rationality&#x27;</span>,
+  <span class="hljs-attr">B</span>: <span class="hljs-string">&#x27;perception&#x27;</span>
+&#125;;
+</code></pre><p>以上内容修改自页面 js，部分非关键属性已忽略，咱也不知道这部分的作者喝了几盘菜，才会让题目向后错了一位。第 7 题的情况比较特殊，其题干固定为“请凭直觉选择一个结果”，选项有四大类若干种组合，取决于且仅取决于前 6 题的选择，分别是：</p><pre class="highlight"><code class="js">[
+  [<span class="hljs-string">&#x27;月光&#x27;</span>, <span class="hljs-string">&#x27;星月夜&#x27;</span>, <span class="hljs-string">&#x27;霓虹灯&#x27;</span>],
+  [<span class="hljs-string">&#x27;敞开的门&#x27;</span>, <span class="hljs-string">&#x27;调色盘&#x27;</span>],
+  [<span class="hljs-string">&#x27;紫水晶&#x27;</span>, <span class="hljs-string">&#x27;荷鲁斯之眼&#x27;</span>],
+  [<span class="hljs-string">&#x27;不死的酒&#x27;</span>, <span class="hljs-string">&#x27;黑色幽默&#x27;</span>, <span class="hljs-string">&#x27;漫长的梦&#x27;</span>]
+];
+</code></pre><pre class="highlight"><code class="js">[
+  [<span class="hljs-string">&#x27;咖啡馆&#x27;</span>, <span class="hljs-string">&#x27;局外人&#x27;</span>],
+  [<span class="hljs-string">&#x27;夜航船&#x27;</span>, <span class="hljs-string">&#x27;灯塔&#x27;</span>, <span class="hljs-string">&#x27;不灭的星&#x27;</span>],
+  [<span class="hljs-string">&#x27;平静的湖面&#x27;</span>, <span class="hljs-string">&#x27;纯粹的灵魂&#x27;</span>],
+  [<span class="hljs-string">&#x27;勇敢的心&#x27;</span>, <span class="hljs-string">&#x27;热烈的拥抱&#x27;</span>]
+];
+</code></pre><pre class="highlight"><code class="js">[
+  [<span class="hljs-string">&#x27;少有人走的路&#x27;</span>, <span class="hljs-string">&#x27;信念感&#x27;</span>],
+  [<span class="hljs-string">&#x27;放大镜&#x27;</span>, <span class="hljs-string">&#x27;因果律&#x27;</span>],
+  [<span class="hljs-string">&#x27;勾股定理&#x27;</span>, <span class="hljs-string">&#x27;万有引力&#x27;</span>, <span class="hljs-string">&#x27;沉默的战歌&#x27;</span>],
+  [<span class="hljs-string">&#x27;迷宫&#x27;</span>, <span class="hljs-string">&#x27;抛物线&#x27;</span>, <span class="hljs-string">&#x27;多米诺骨牌&#x27;</span>]
+];
+</code></pre><pre class="highlight"><code class="js">[
+  [<span class="hljs-string">&#x27;棱镜&#x27;</span>, <span class="hljs-string">&#x27;五线谱&#x27;</span>],
+  [<span class="hljs-string">&#x27;溪底的绿宝石&#x27;</span>, <span class="hljs-string">&#x27;暗恋者的目光&#x27;</span>, <span class="hljs-string">&#x27;松软的积雪&#x27;</span>],
+  [<span class="hljs-string">&#x27;平行世界&#x27;</span>, <span class="hljs-string">&#x27;小行星&#x27;</span>],
+  [<span class="hljs-string">&#x27;春夏秋冬&#x27;</span>, <span class="hljs-string">&#x27;钟摆&#x27;</span>]
+];
+</code></pre><p>以上每一行代表一个选项可能出现的内容，其产生方式及和前 6 题选择的对应关系见下文。</p><h2 id="测试结果"><a class="markdownIt-Anchor" href="#测试结果"></a> 测试结果</h2><blockquote><p>Q: 这个测试都有哪些可能的结果？</p></blockquote><p>有四大类每类 4 个共计 16 个结果，通过一个 HTTP 请求获得，经格式化和删除非必要字段后如下：</p><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section1-1&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;唯美主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;AESTHETICISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;月光&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;星月夜&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;霓虹灯&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（美好、纯真、品味）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;唯美主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创造并享受一切&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;美的东西&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创造并享受一切&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有3%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;美的东西&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;美好&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;唯美主义向往极致美感，有独特的审美取向。他们是所有主义里最耀眼的存在，是世 界上极为珍贵且特殊的人格。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;纯真&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;唯美主义的你具备古典主义时期的重要原则：爱与理性。你拥有最纯洁的思想和单纯的信 念，这让你极具魅力！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;美学革新都是由精英引领的&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你们是最能领悟艺术性的人，但很可惜拥有这种人格类型的人并不常见，只有3%。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;莫奈&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你是落日弥漫的橘，天边透亮的星&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Hea2t&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section1-2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;融合主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SYNCRETISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;敞开的门&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;调色盘&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（智慧，创新，热爱）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;融合主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;能够站在更高的视角&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;容纳万物&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;能够站在更高的视角&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有5.2%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;视角容纳万物&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;智慧&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;融合主义倡导不同信仰和哲学主张的融合。他们能把不相融的观点和知识为己所用， 因为智慧而备受大家欢迎。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创新&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;融合主义的你生来就能博采众长、创造出高价值的新兴事物。你的生活既有灵性的深度， 又有世俗的成功！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你是高瞻远瞩的集大成者&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5.2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你们极为罕见，常常是团队的灵魂人物，能够帮助、启发他人并造福世界。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;秦始皇&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;O Come, O Come, Emmanuel&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Simeon Walker&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section1-3&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;神秘主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;MYSTICISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;紫水晶&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;荷鲁斯之眼&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（变革，深邃，幸运）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;神秘主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;勇敢打破了黑白的边界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;推动了物理学的发展&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;推动了物理学的发展&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有4.35%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;发展&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;变革&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;神秘主义是探求自然力量的结果，极具开创性。他们往往带来伟大而积极的变革，如 炼金术推动了物理学的发展。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;深邃&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;神秘主义的你拥有常人难以读懂的思想。你常常以深邃的灵魂和生活哲学，带给自己和他 人改变、幸运和奇迹！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你用深邃的灵魂去探索未知&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4.35&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这个世界正需要你这样目标感明确且充满才智的人！很可惜你这样的人并不常见。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;弗洛伊德&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Germination&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;坂本龍一&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section1-4&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;荒诞主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ABSURDISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;不死的酒&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;黑色幽默&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;漫长的梦&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（对抗，热忱，无畏）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有荒诞主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;才能看清楚生活的真相&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;才能看清楚生活的真相&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有6.7%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;生活的真相&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;对抗&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;荒诞主义是最深层次的乐观主义。这种思想极为罕见。他们并非诞生于简单的世界， 而是源于对黑暗和痛苦的勇敢对抗。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;热忱&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;荒诞主义的你既能接受生命的虚无，也能享受心灵的自由。所以你拥有深刻的力量，远远 超过其他思想流派的浅薄！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你拥有自由的灵魂和孤高的梦&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6.7&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你常被人误解为不够务实，但当找到志同道合的人时，你会取得让所有人震惊的优异 成绩。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;梵高&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;L&#x27;Estro Armonico No. 6 in A Minor:III. Presto&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Academy of St. Martin in the Fields&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section2-1&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;存在主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;EXISTENTIALISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;咖啡馆&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;局外人&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（坚定，自驱力，自由）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;对于存在主义来说&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;世界存在于你的存在！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;世界存在于你的存在！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有2%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;坚定&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;存在主义是西方哲学主要的流派之一。他们往往以人为中心、尊重个性与自由，始终 以最滋养自己的方式存在。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;自驱力&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;存在主义的你能在热爱的世界里焕发光芒，凭自己的力量成为生命的主宰。被狂暴的命运 裹挟，却依然选择温暖纯良！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你不会选择成为别人&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只会选择成为自己&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;人们常说，高处不胜寒。作为人数最少且战略能力最强的人格类型，你们对此深有体 会。 &quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;达芬奇&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Happiness Does Not Wait&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Ólafur Arnalds&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section2-2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;利他主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ALTRUISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;夜航船&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;灯塔&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;不灭的星&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（大格局，治愈，真实）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;真正的高手&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;都是利他主义者&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;真正的高手&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有8.5%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;black&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;都是利他主义者&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;大格局&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;利他主义是最高尚的哲学主义。他们滋养万物，又不与万物相争。 把人类从混沌模糊的世界，带向确定性的光明。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;治愈&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;利他主义的你内心慷慨而温柔，是最有人情味的人。你在工作或家庭中都是中心人物，是 人群中不变的焦点！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你是温暖他人的光&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8.5&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你们为他人着想的性格，使你们深受家庭和组织的青睐，常常承担着凝聚人心的角色 。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;孔子&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;The Dream Waltz&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Mike Strickland&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section2-3&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;游世主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ZHAUNGISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;平静的湖面&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;纯粹的灵魂&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（逍遥，超然，豁达）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;游世主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;是庄子人生理想的&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;最高境界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;最高境界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有3.2%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;black&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;的最高境界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;逍遥&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;游世主义塑造了世人自由的性格，为中国知识分子提供了取用不竭的精神营养。正所 谓踏遍山河湖海，不舍自由与爱。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;超然&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;游世主义的你拥有悠游于世的浪漫情怀。你的内心住着一个年逾不惑的智者，始终用澄明 的心境对抗人生的无意义！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你踏遍山河，不舍自由与爱&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3.2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这个比例不多也不少，你们的有趣想法太多，占比再高就需要更多严苛的人来做后勤 工作。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;庄子&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;月影湖光&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;常静/瑞鸣音乐&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section2-4&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;乐观主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;OPTIMISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;勇敢的心&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;热烈的拥抱&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（生命力，进取，善良）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;坚定的乐观主义是&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;一切成功的必由之路&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;一切成功的必由之路&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有7%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;black&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;成功的必由之路&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;生命力&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;乐观主义是向善的哲学。他们不是盲目乐观，而是接受社会复杂后仍能保持旺盛的生 命力。成功者一定具备乐观精神。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;进取&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;乐观主义的你认为生活是一场能赢的大冒险。你期待有趣的挑战并总能赢得胜利，最终将 进取深深刻入你的基因!&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你拿着生活的遥控器&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;7&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你们总是在人群中慷慨撒播爱与善意，释放出鼓励他人、滋养他人的积极能量。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;贝多芬&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;【手风琴】Octopath Traveler - Primrose, the Dancer（翻自 西木康智） &quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;风流先森&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section3-1&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;怀疑论&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SKEPTICISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;少有人走的路&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;信念感&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（思辨，勇气，独立）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;没有怀疑论&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;就没有近代哲学的产生&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;就没有近代哲学的产生&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有5.5%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;哲学的产生&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;思辨&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;怀疑论奠定了西方哲学的基础。怀疑论不是怀疑一切，而是怀疑一切绝对。他们能在 混沌世界中辨别黑白，直达万物本质。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;勇气&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;充满怀疑论精神的你从不放弃对生活的想象，在残酷世界里步履不停。只有你始终胸怀「 虽千万人吾往矣」的勇气！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你是逻辑上最缜密的人&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5.5&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;虽然少见，但是怀疑论者不屑与「平庸」为伍。孤身一人也有改变世界的魄力和勇气 。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;伽利略&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Dance of a Hummingbird&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Ernesto Cortazar&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section3-2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;演绎主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;DEDUCTIONISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;放大镜&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;因果律&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（逻辑力，远见，冷静）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;拥有演绎思维的人&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;能左右文明的终向&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;能左右文明的终向&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有3.7%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;文明的终向&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;逻辑力&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;演绎主义是寻求真理的强者哲学。作为发现新事物的科学方法，它通过逻辑推演出必 然的知识，影响了近代科学的发展。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;严谨&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;演绎主义的你能轻松地应对纷杂世界。在真理探索中，你更接近本质。迷失方向时跟着你 的脚步总是对的！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;别人苦寻真相，你唾手可得&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3.7&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3.7%的占比不多不少。因为如果再少，世界上就缺乏了你们带来的独有活力。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;爱因斯坦&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Playing Girev I&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Carlos Rafael Rivera&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section3-3&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;理性主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;RATIONALISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;勾股定理&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;万有引力&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;沉默的战歌&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（客观，智慧、可靠）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;理性思维是&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;人类探索近代科学的基础&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;人类探索近代科学的基础&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有4.5%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;科学的基础&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;客观&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;理性主义是当今人类决策的主要哲学方法。它不断驱动革新，实现了文明的迭代。真 正拥有理性思维的人极为罕见。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;可靠&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;理性主义的你能对万物进行系统思辨，找到深藏于表层下的因果规律。你总是能让身边人 惊叹，是最聪慧的理想型人格！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;智慧让你成为最可靠的人&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4.5&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;作为思考能力最强的哲学类型，你们从小是“别人家的小孩”，也是社会不可或缺的 中流砥柱。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;牛顿&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Jazz Suite No. 2: Waltz No. 2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;The City of Prague Philharmonic Orchestra&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section3-4&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;决定论&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;DETERMINISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;迷宫&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;抛物线&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;多米诺骨牌&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（独立，洞察，专注）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;决定论&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;在18、19世纪&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;统治了科学界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;统治了科学界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有8%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;了科学界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;独立&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;决定论是掌握外界知识的最佳方法。他们全凭自己的超人思维和推断来做出正确决策 。决定论是最具领导天赋的哲学流派。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;正直&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;决定论的你拥有强大的因果思维，可以用上帝视角解决问题。当一定要有人站出来扮演关 键角色时，那个人最好是你！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你总在扮演关键角色&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;世界上只有8%的人口拥有决定论的思想，但是你们推动了80%的科学发展。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;阿基米德&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Cornfield Chase&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Michael Forster/Anna Stevens&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section4-1&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;建构主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;COLLECTIVISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;棱镜&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;五线谱&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（创造力，突破，细腻）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;建构主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创造出这个时代的艺术&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创造出这个时代的艺术&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有4%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;black&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;的艺术&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创造力&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;建构主义从一开始就不仅是一种建筑风格。建构主义者擅长打破知识的边界，像城邦 里的国王，用全局视角改变着世界。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;突破&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你具备的建构思维是少数知识阶层的奢侈品。你的脑洞能让周围人目瞪口呆，是最为典型 的发明家和创新者！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你勇于打破刻板印象&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;好在只有 4% 的人有建构主义倾向，否则你的碾压级能力很容易让其他人怀疑人生。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;包豪斯&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Random Access Memories (Vanderway Edit)&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Daft Punk&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section4-2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;斯多葛主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;STOICISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;溪底的绿宝石&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;暗恋者的目光&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;松软的积雪&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（优雅，无畏，通透）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;斯多葛主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;是现代最多人追求的&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;古老哲学&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;是现代最多人追求的&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有8.1%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;black&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;追求的古老哲学&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;优雅&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;斯多葛主义倡导「用从容面对无常」。它以理性驾驭情感、是诗与哲学的对抗，深刻 影响了人文 、宗教等领域。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;无畏&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;斯多葛主义的你面对生命的试炼，是最坦诚无惧的那个人。你往往能给予世界上最可靠的 安全感，是最好的聆听者和导师！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有你是真正从容的&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8.1&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;现代社会非常需要你们这样的领导者，难怪很多著名的政治家和商业领袖都具有这一 气质。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;亚当斯密&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;春夜、雨を喜ぶ - メインテーマ&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;小瀬村晶/信澤宣明&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section4-3&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;永恒论&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ETERNALISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;平行世界&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;小行星&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（智谋，前瞻性，专注）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;永恒论&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;打破了人类维度的边界&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创造万物又隐于万物&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;创造万物又隐于万物&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有6.2%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;万物&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;智谋&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;永恒论让科学假想落地，是最复杂的哲学流派。永恒论者能够洞察时间的真理，持续 探索自我的丰富性和无限创造力。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;前瞻性&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;永恒论的你思想不受时空所约束。繁星纵变，智慧永恒。你既能像古人那样拓荒性地思考 ，又能够像先知一样充满预见性！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你的思想超越时空&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6.2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你们让人如沐春风的气质奠定了整个社会的美好基调，你的存在即是美好的象征。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;巴赫&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Nostalgie&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Luigi Rubino&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;section4-4&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;中文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;长期主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;英文名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;LONG-TERMISM&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;选项词（换行&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;春夏秋冬&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;钟摆&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;关键词&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;（洞察，内驱力，财富）&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;长期主义&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;洞悉世间法则&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;地位句3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;谋定而后动&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;高亮句&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;洞悉世间法则&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;这类哲学人格非常稀少&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;稀缺句2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;只有3.5%&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;底部logo颜色&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;标题句18字(第2行)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;谋定而后动&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质3字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;洞察&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;本质正文46字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;长期主义是文明社会不断向前的重要力量。真正的长期主义并非毅力强于常人，而是 具备一种深刻洞察和强大的魄力。&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;内驱力&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;天赋正文&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;长期主义的你，对于完美的追求和过人的耐心是其他主义所不具有的。所以你总是能以时 间为筹码获得更大的胜利！&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第1行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你坚持做难而正确的事&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;表述句（第2行）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;所占百分比(%)&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3.5&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;占比描述50字&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;现代社会非常需要你们这种踏实而坚韧的人格类型，你们对世界发展的贡献不容忽视 。 &quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;名人（6个字以内）&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;比尔盖茨&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌曲名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6 Songs, Op. 34:No. 2, Auf Flügeln des Gesanges, MWV K86 (Transcr. Capuçon for Violin and Piano)&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;歌手名&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Renaud Capuçon/Etienne Collard/Jerome Ducros/Ulrich Ruscher&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;哲理名言&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;每个人天生是哲学家——黑格尔&quot;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><h2 id="测试逻辑"><a class="markdownIt-Anchor" href="#测试逻辑"></a> 测试逻辑</h2><blockquote><p>Q: 你的选择如何对应到你的结果？</p></blockquote><p>对应到结果的过程分为确定大类和确定结果两步。</p><h3 id="确定大类"><a class="markdownIt-Anchor" href="#确定大类"></a> 确定大类</h3><p>这一部分涉及前 6 题，我们可以发现，前 6 题中，有三题的选项绑定了 rationality 或 perception 字段，另三题的选项绑定了 comic 或 tragic 字段，在全部 6 题结束后，可以统计出选择 rationality、perception、comic、tragic 的数量。</p><p>rationality 和 perception 为一组，如果 rationality 的数量更多则结果为 rationality，否则结果为 perception；comic 和 tragic 为一组，如果 comic 的数量更多则结果为 comic，否则结果为 tragic。</p><p>根据如上所述的两组的四种组合，可以通过如下规则确认大类：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> rule = &#123;
+  <span class="hljs-attr">tragic</span>: &#123;
+    <span class="hljs-attr">perception</span>: <span class="hljs-string">&#x27;section1&#x27;</span>,
+    <span class="hljs-attr">rationality</span>: <span class="hljs-string">&#x27;section3&#x27;</span>
+  &#125;,
+  <span class="hljs-attr">comic</span>: &#123;
+    <span class="hljs-attr">perception</span>: <span class="hljs-string">&#x27;section2&#x27;</span>,
+    <span class="hljs-attr">rationality</span>: <span class="hljs-string">&#x27;section4&#x27;</span>
+  &#125;
+&#125;;
+</code></pre><h3 id="确定结果"><a class="markdownIt-Anchor" href="#确定结果"></a> 确定结果</h3><p>在测试结果一节中，每个结果存在一个“选项词（换行”字段，将所属大类的四个结果的该字段取出，分别从中任选一个，即可组成第 7 题。第 7 题的选择直接对应到相应的结果。</p><h2 id="证据支持"><a class="markdownIt-Anchor" href="#证据支持"></a> 证据支持</h2><blockquote><p>Q: 你是如何得出上述结果的？</p></blockquote><p>翻代码，下断点调试出来的。这个项目基于 React，很容易找到关键的状态设置：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> state = &#123;
+  <span class="hljs-attr">sectionConfig</span>: &#123;
+    <span class="hljs-attr">tragic</span>: &#123;
+      <span class="hljs-attr">perception</span>: <span class="hljs-string">&#x27;section1&#x27;</span>,
+      <span class="hljs-attr">rationality</span>: <span class="hljs-string">&#x27;section3&#x27;</span>
+    &#125;,
+    <span class="hljs-attr">comic</span>: &#123;
+      <span class="hljs-attr">perception</span>: <span class="hljs-string">&#x27;section2&#x27;</span>,
+      <span class="hljs-attr">rationality</span>: <span class="hljs-string">&#x27;section4&#x27;</span>
+    &#125;
+  &#125;,
+  <span class="hljs-attr">perception</span>: <span class="hljs-number">0</span>,
+  <span class="hljs-attr">rationality</span>: <span class="hljs-number">0</span>,
+  <span class="hljs-attr">comic</span>: <span class="hljs-number">0</span>,
+  <span class="hljs-attr">tragic</span>: <span class="hljs-number">0</span>,
+  <span class="hljs-attr">sectionName</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+  <span class="hljs-attr">maxVertical</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+  <span class="hljs-attr">maxHorizontal</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+  <span class="hljs-attr">keyWordList</span>: [],
+  <span class="hljs-attr">ismId</span>: <span class="hljs-string">&#x27;section1-1&#x27;</span>,
+  <span class="hljs-attr">resultData</span>: &#123;&#125;
+&#125;;
+</code></pre><p>状态更新的过程经过翻译，但还是可以看出其逻辑，关键在于 <code>e[t] + 1</code> 和对 <code>r</code> 与 <code>n</code> 的更新：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> setScore = <span class="hljs-keyword">function</span> (<span class="hljs-params">e, t</span>) &#123;
+  <span class="hljs-keyword">var</span> t = <span class="hljs-title function_">A</span>(<span class="hljs-title function_">A</span>(&#123;&#125;, e), &#123;&#125;, <span class="hljs-title function_">s</span>(&#123;&#125;, t, e[t] + <span class="hljs-number">1</span>)),
+    n = t.<span class="hljs-property">perception</span>,
+    r = t.<span class="hljs-property">rationality</span>,
+    o = t.<span class="hljs-property">comic</span>,
+    r = r &lt; n ? <span class="hljs-string">&#x27;perception&#x27;</span> : <span class="hljs-string">&#x27;rationality&#x27;</span>,
+    n = t.<span class="hljs-property">tragic</span> &lt; o ? <span class="hljs-string">&#x27;comic&#x27;</span> : <span class="hljs-string">&#x27;tragic&#x27;</span>,
+    i = t.<span class="hljs-property">sectionConfig</span>[n][r],
+    o = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">values</span>(e.<span class="hljs-property">resultData</span>),
+    a = [];
+  o.<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+    <span class="hljs-keyword">var</span> t;
+    <span class="hljs-literal">null</span> != (t = e.<span class="hljs-property">id</span>) &amp;&amp; t.<span class="hljs-title function_">includes</span>(i) &amp;&amp; a.<span class="hljs-title function_">push</span>(e.<span class="hljs-property">optionName</span>);
+  &#125;);
+  <span class="hljs-keyword">return</span> <span class="hljs-title function_">A</span>(<span class="hljs-title function_">A</span>(&#123;&#125;, t), &#123;&#125;, &#123; <span class="hljs-attr">maxVertical</span>: r, <span class="hljs-attr">maxHorizontal</span>: n, <span class="hljs-attr">sectionName</span>: i, <span class="hljs-attr">keyWordList</span>: a &#125;);
+&#125;;
+</code></pre><p>这一部分的调试结果如下：</p><img src="/assets/images/test/wyy-philosophy/pic-1.png"><p>随机选择得到第 7 题选项的逻辑如下：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">function</span> <span class="hljs-title function_">t</span>(<span class="hljs-params"></span>) &#123;
+  <span class="hljs-keyword">if</span> (p &amp;&amp; p.<span class="hljs-property">length</span>) &#123;
+    [<span class="hljs-string">&#x27;A&#x27;</span>, <span class="hljs-string">&#x27;B&#x27;</span>, <span class="hljs-string">&#x27;C&#x27;</span>, <span class="hljs-string">&#x27;D&#x27;</span>].<span class="hljs-title function_">forEach</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e, t</span>) &#123;
+      <span class="hljs-keyword">var</span> n = (p || [])[t] || [];
+      (b.<span class="hljs-property">current</span>.<span class="hljs-property">index</span>[t] = -<span class="hljs-number">1</span> &lt; b.<span class="hljs-property">current</span>.<span class="hljs-property">index</span>[t] ? b.<span class="hljs-property">current</span>.<span class="hljs-property">index</span>[t] : <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">round</span>(<span class="hljs-title class_">Math</span>.<span class="hljs-title function_">random</span>() * (n.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>))),
+        (b.<span class="hljs-property">current</span>.<span class="hljs-property">text</span>[t] = <span class="hljs-string">&#x27;&#x27;</span>.<span class="hljs-title function_">concat</span>(e, <span class="hljs-string">&#x27;.&#x27;</span>).<span class="hljs-title function_">concat</span>(n[b.<span class="hljs-property">current</span>.<span class="hljs-property">index</span>[t]] || <span class="hljs-string">&#x27;&#x27;</span>));
+    &#125;);
+  &#125;
+&#125;
+</code></pre><p>这一部分的调试结果如下：</p><img src="/assets/images/test/wyy-philosophy/pic-2.png"><p>最终结果确认的逻辑如下：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">function</span> <span class="hljs-title function_">e</span>(<span class="hljs-params">e</span>) &#123;
+  <span class="hljs-keyword">var</span> r = a ? +_.<span class="hljs-title function_">slice</span>(<span class="hljs-number">9</span>, <span class="hljs-number">10</span>) - <span class="hljs-number">1</span> : e;
+  <span class="hljs-keyword">if</span> (!O.<span class="hljs-property">current</span> &amp;&amp; u) &#123;
+    h.<span class="hljs-property">current</span> += <span class="hljs-number">1</span>;
+    <span class="hljs-title class_">Object</span>(Y.<span class="hljs-property">c</span>)(<span class="hljs-string">&#x27;19th_philosophy_test_question&#x27;</span>.<span class="hljs-title function_">concat</span>(h.<span class="hljs-property">current</span>), &#123;
+      <span class="hljs-attr">mspm</span>: <span class="hljs-string">&#x27;6294abd69f09963085e72fec&#x27;</span>,
+      <span class="hljs-attr">target</span>: <span class="hljs-string">&#x27;19th_philosophy_test&#x27;</span>,
+      <span class="hljs-attr">targetid</span>: <span class="hljs-string">&#x27;19th_philosophy_test&#x27;</span>,
+      <span class="hljs-attr">resourceid</span>: h.<span class="hljs-property">current</span>
+    &#125;);
+    O.<span class="hljs-property">current</span> = !<span class="hljs-number">0</span>;
+    A.<span class="hljs-property">current</span>[r].<span class="hljs-property">motionGraph3</span> &amp;&amp;
+      X.<span class="hljs-property">a</span>.<span class="hljs-title function_">parseURL</span>(A.<span class="hljs-property">current</span>[r].<span class="hljs-property">motionGraph3</span>).<span class="hljs-title function_">then</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e</span>) &#123;
+        R.<span class="hljs-property">current</span>[r] = e;
+      &#125;);
+    <span class="hljs-keyword">var</span> t = a ? _ : <span class="hljs-string">&#x27;&#x27;</span>.<span class="hljs-title function_">concat</span>(v, <span class="hljs-string">&#x27;-&#x27;</span>).<span class="hljs-title function_">concat</span>(r + <span class="hljs-number">1</span>);
+    <span class="hljs-comment">// ......</span>
+  &#125;
+&#125;
+</code></pre><pre class="highlight"><code class="js"><span class="hljs-comment">// ......</span>
+<span class="hljs-keyword">var</span> c = r.<span class="hljs-property">resultData</span>;
+<span class="hljs-keyword">var</span> i = r.<span class="hljs-property">ismId</span>;
+<span class="hljs-keyword">var</span> r = c[i || e] || &#123;&#125;;
+<span class="hljs-keyword">var</span> c = <span class="hljs-title class_">Object</span>(w.<span class="hljs-property">c</span>)(r);
+<span class="hljs-keyword">var</span> r = <span class="hljs-title class_">Object</span>(A.<span class="hljs-property">c</span>)();
+<span class="hljs-keyword">var</span> a = r.<span class="hljs-property">prepareShare</span>;
+<span class="hljs-keyword">var</span> r = r.<span class="hljs-property">config</span>;
+<span class="hljs-keyword">var</span> s = <span class="hljs-literal">null</span> == r || <span class="hljs-literal">null</span> == (r = r.<span class="hljs-property">extraConfig</span>) ? <span class="hljs-keyword">void</span> <span class="hljs-number">0</span> : r.<span class="hljs-property">sharePic</span>;
+<span class="hljs-keyword">var</span> l = <span class="hljs-title class_">Object</span>(w.<span class="hljs-property">f</span>)() || <span class="hljs-title class_">Object</span>(w.<span class="hljs-property">e</span>)();
+<span class="hljs-comment">// ......</span>
+</code></pre><p>这一部分的调试结果如下：</p><img src="/assets/images/test/wyy-philosophy/pic-3.png"> <img src="/assets/images/test/wyy-philosophy/pic-4.png"><h2 id="心得体会"><a class="markdownIt-Anchor" href="#心得体会"></a> 心得体会</h2><blockquote><p>Q: 所以分析了一通有啥想法吗？</p></blockquote><p>一方面又碰上了 React 顺便复习了一下 React，感觉 React 的设计还是很有想法的，有空搞个 React 的项目来写。另一方面网易云这测试难得的没有随机结果，从选项到结果的对应关系均匀且（肉眼看上去）还算合理了，只是有个小问题，如下：</p><blockquote><p>稀缺句 2: 只有 3%<br>稀缺句 2: 只有 5.2%<br>稀缺句 2: 只有 4.35%<br>稀缺句 2: 只有 6.7%<br>稀缺句 2: 只有 2%<br>稀缺句 2: 只有 8.5%<br>稀缺句 2: 只有 3.2%<br>稀缺句 2: 只有 7%<br>稀缺句 2: 只有 5.5%<br>稀缺句 2: 只有 3.7%<br>稀缺句 2: 只有 4.5%<br>稀缺句 2: 只有 8%<br>稀缺句 2: 只有 4%<br>稀缺句 2: 只有 8.1%<br>稀缺句 2: 只有 6.2%<br>稀缺句 2: 只有 3.5%</p></blockquote><p>聪明的，你告诉我，为什么每一种结果都稀缺呀？上面这些加起来是多少呀？</p><h2 id="白嫖时间"><a class="markdownIt-Anchor" href="#白嫖时间"></a> 白嫖时间</h2><blockquote><p>Q: 来点响应解析脚本？</p></blockquote><p>拿走不谢。</p><pre class="highlight"><code class="python"><span class="hljs-keyword">import</span> json
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&#x27;__main__&#x27;</span>:
+    <span class="hljs-keyword">with</span> <span class="hljs-built_in">open</span>(<span class="hljs-string">&#x27;resp.json&#x27;</span>, <span class="hljs-string">&#x27;r&#x27;</span>, encoding=<span class="hljs-string">&#x27;utf8&#x27;</span>) <span class="hljs-keyword">as</span> file:
+        raw = json.loads(file.read())
+    parse = raw[<span class="hljs-string">&#x27;data&#x27;</span>][<span class="hljs-string">&#x27;activityBench#st-philosophy-story&#x27;</span>][<span class="hljs-string">&#x27;excel&#x27;</span>][<span class="hljs-string">&#x27;raw&#x27;</span>][<span class="hljs-string">&#x27;resultConfig&#x27;</span>]
+    content, base = parse[<span class="hljs-number">0</span>], parse[<span class="hljs-number">2</span>:]
+    filtered, result = [], [&#123;&#125; <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-built_in">len</span>(base))]
+    <span class="hljs-keyword">for</span> index, text <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(content):
+        flag = <span class="hljs-literal">False</span>
+        <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> base:
+            <span class="hljs-keyword">if</span> <span class="hljs-built_in">type</span>(i[index]) != <span class="hljs-built_in">int</span> <span class="hljs-keyword">and</span> <span class="hljs-built_in">str</span>(i[index]) != <span class="hljs-string">&quot;&quot;</span> \
+                    <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> <span class="hljs-built_in">str</span>(i[index]).startswith(<span class="hljs-string">&#x27;http&#x27;</span>) \
+                    <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> <span class="hljs-built_in">str</span>(i[index]).startswith(<span class="hljs-string">&#x27;#&#x27;</span>):
+                flag = <span class="hljs-literal">True</span>
+        <span class="hljs-keyword">if</span> flag:
+            <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-built_in">len</span>(result)):
+                result[i][content[index]] = base[i][index]
+        <span class="hljs-keyword">else</span>:
+            filtered.append(content[index])
+    <span class="hljs-built_in">print</span>(json.dumps(filtered, indent=<span class="hljs-number">4</span>, ensure_ascii=<span class="hljs-literal">False</span>))
+    <span class="hljs-built_in">print</span>(json.dumps(result, indent=<span class="hljs-number">4</span>, ensure_ascii=<span class="hljs-literal">False</span>))
+</code></pre><h2 id="意外之喜"><a class="markdownIt-Anchor" href="#意外之喜"></a> 意外之喜</h2><p>找直链的过程中无意中发现了网易云还有个<a href="https://sg.music.163.com/g/seventranslation">表白翻译机</a>，看了一下，是前端随机的，情话池如下：</p><pre class="highlight"><code class="js"><span class="hljs-keyword">const</span> r = [
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你是我的会话置顶&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Mail&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Sweet to Me&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;Summer Salt&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我去接你,等着吧~&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Moto&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;傍晚去太子湾吗&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;Schoolgirl byebye&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;世界一般,但你超值&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;SuperMan&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;无人的海边&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;霓虹花园&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你像一个人,我的人~&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Couple&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;沉沦与遐想&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;C.HOPE&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;不好说喜欢,@ 只是看见你会乱&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Next&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;I Do&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;911&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你的风吹草动@ 都让我心事重重&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Sad&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;是但求其爱&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;陈奕迅&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;情话都是学来的,@ 但爱你是真的&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Hand&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;恶作剧&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王蓝茵&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我一点不想你,@ 一点二十五再想&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;CatClock&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Nice Boys&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;TEMPOREX&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;跟你聊天不算目的,@ 被你喜欢才是&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Heart&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;不仅仅是喜欢&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;萧全/孙语赛&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我一个人是不敢的,@ 有了你,我就敢&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;People&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;拥抱&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;五月天&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;非要我学电焊,@ 才能让你眼前一亮吗?&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Altman&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;TOKYO BON&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;黄明志&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;静下来想你觉得一切@ 都美好的不可思议&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Star&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;My Jinji&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;落日飞车&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;喜欢你已超过两分钟,@ 不能撤回了&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Mouse&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;HAVE A NICE DAY&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;魏如萱&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我的喜欢写在风里,@ 从此整个世界都是你&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Jump&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;夏天的风&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;温岚&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;有人收闲置宝贝吗?@ 反正我闲着也是闲着&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Sleep&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;宝贝&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;张悬&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你是个什么棒槌,@ 能把我的心锤得砰砰响&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Pig&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;遇见你的时候所有星星都落到我头上&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;高珊&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;怎么我睡不着@ 你也不来救我&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Panada&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;怎么我睡不着你也不来救我&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;焦迈奇&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;偶尔想你,经常偶尔&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Pig2&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;我是一只鱼&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;落日飞车&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;好多喜欢,@ 藏在欲言又止里&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;See&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;我喜欢上你时的内心活动&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;陈绮贞&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我不但可爱,@ 还可爱你了&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Dog&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;热爱105℃的你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;阿肆&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;那次车窗起雾@ 写的是你名字&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;K.&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;Cigarettes After Sex&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我想穿过对话框,@ 去抱抱你&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Hug&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;想去海边&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;夏日入侵企画&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;落日好美,@ 该用什么理由发给你呢&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Sun&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;你是落日弥漫的橘，天边透亮的星&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;Hea2t&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我喜欢你,嘴巴不说@ 不代表眼睛不会&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Eyes&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;目及皆是你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;小蓝背心&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;怕无归期,怕空欢喜,@ 怕来者不是你&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Boy&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;水星记&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;郭顶&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我这个人超好的,@ 你可以放心喜欢一下&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;HeartBox&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;我当你空气&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;旺福&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我希望,以后你能用@ 我的名字拒绝所有人&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Police&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;City of Stars&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;Ryan Gosling/Emma Stone&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;电话你先挂,消息我垫底&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Bear&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Sweet&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;Cigarettes After Sex&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;又没忍住,向宇宙@ 发送了想你的脑电波&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Red&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Alpha&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;橘子海&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我单身,我致富,@ 早日住上大别墅&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;DogHome&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;不潮不用花钱&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;林俊杰&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;祝大家拥有爱情,@ 而我拥有金钱&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Money&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;GQ&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;Lola Coca&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;想让你吃醋@ 又怕你祝我幸福&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Broken&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;孤单心事&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;颜人中&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;相爱没有那么容易,@ 每个人都有他的手机&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Mobile&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;没那么简单&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;黄小琥&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;被你赞过的朋友圈,@ 叫甜甜圈&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Sweet&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;喜欢你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;徐佳莹&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;心动就是,完了完了完了&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Never&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Everything Sucks&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;vaultboy&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你保护世界,我保护你&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;追光者&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;岑宁儿&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;如果此刻我刚好喜欢你,@ 那么现在就是未来&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;温柔&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;五月天&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;余生请多指教&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;温柔&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;五月天&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;从日落到清晨的月光,@ 抱你到天亮&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;当你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;林俊杰&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你身上有光,@ 我抓来看看&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;如果只是擦肩&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;吴大文&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我想牵你的手,@ 看月色慢慢温柔&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;最美的时光&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王源&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我是你眼中的光,@ 你何尝不是我的呢&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;想见你想见你想见你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王俊凯等&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;努力努力再努力,@ 和你~&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;对你表白&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;windy city&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我愿意为你成为@ 一座固若金汤的城池&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;有点甜&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;汪苏泷/By2&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;感谢你闯入我的人生,@ 你是我的人生奇遇&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;我就是控制不住喜欢你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;庯川芁一（不川秋衣）&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;把你变成我的,@ 用所有的方式&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;青柠&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;徐秉龙/桃十五&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;偏偏是你@ 成了我的偏爱与例外&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;还是会想你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;林达浪/h3R3&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;超级喜欢你,@ 嘴上三分,心里十分&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;沦陷&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;魏晨&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;情人总分分合合,@ 可是我们却越爱越深&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;爱的就是你&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王力宏&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我是你的霏同寻常&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;这份甜蜜&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;路飞仙贝&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我会用9秒83的速度@ 出现在你面前&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;女孩&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;黄鲲&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我舍不得和你说再见&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;等海&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;苏玮（小残）&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;坐下,坐上我的副驾&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Drive You Home&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王嘉尔/Internet Money&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;光是遇见,就很美好&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你向着光,我向着你&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;光所向,心所往&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;温暖的灵魂终将相遇&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu5&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;只要你呼唤,@ 蝴蝶与我都会飞向你&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu2&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;遇见光,靠近光,@ 追随光,成为光,散发光&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu3&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;云野微风,霞谷落日,@ 和你的每一天都刚刚好&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;如鲲向光,似鸟归林,@ 与你并肩朝温暖前行&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu2&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;你缓缓走来,@ 用光亮驱散我周身的阴霾&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu3&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;这两个字就是光遇的@ 通关秘籍&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我从远方赶来,@ 恰巧你们也在&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu2&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;孤独的狼你好,@ 我是酒醉的玫瑰&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu2&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;和你喜欢的一切在一起&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;从你叫什么名字开始,@ 后来有了一切&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;遇上了,就是最好的时光&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自《光·遇》玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;虽然我玩不懂光遇,@ 但如果你玩我就陪你&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;GuangYu1&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;guangyu&#x27;</span>,
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;来自某竞技游戏核心玩家&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;跨过界限,改变世界&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Hand&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;恶作剧&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王蓝茵&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;我的眼睛就是尺&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Hand&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;恶作剧&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王蓝茵&#x27;</span>
+    &#125;
+  &#125;,
+  &#123;
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;容颜如玉,身姿如松,@ 翩若惊鸿,宛若游龙&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;Hand&#x27;</span>,
+    <span class="hljs-attr">songData</span>: &#123;
+      <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;恶作剧&#x27;</span>,
+      <span class="hljs-attr">author</span>: <span class="hljs-string">&#x27;王蓝茵&#x27;</span>
+    &#125;
+  &#125;
+];
+</code></pre></div><div>Word count: 12k</div><div>Reading time: 50min</div><div><div><a href="/archive/2021/06/1">Created 2021-06-21T05:02:01.000Z</a></div></div><div><div><a href="/archive/2021/06/1">Last Modified 2021-06-21T05:02:01.000Z</a></div></div><div><br><br></div></div></content><div><br></div><footer>Copyright © 2021-2023 Chenrt Blog</footer></noscript><div id="app"></div></body></html>

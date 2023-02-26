@@ -1,0 +1,469 @@
+<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 对动物性格测试的简要分析与结果解析</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/b7518e17009a"><h1>对动物性格测试的简要分析与结果解析</h1></a><div><div><div><a href="/category/Misc/1">Misc</a></div></div></div><div><div><div><a href="/tag/Python/1">Python</a></div><div><a href="/tag/Crawling/1">Crawling</a></div></div></div><div><p>[迁移自博客园] | 在服务端完成计算，共有 16 种可能的结果，靠谱程度一般。</p><span id="more"></span><h2 id="测试过程"><a class="markdownIt-Anchor" href="#测试过程"></a> 测试过程</h2><p>经尝试，无法在浏览器中正常登陆并进行测试，必须在微信或 QQ 中进行测试，比较自然的想到使用安卓模拟器配合抓包分析或手机连电脑热点抓包分析，下面采用第二种方式，通过 Fiddler 分析 QQ 中的动物性格测试。</p><p>打开动物性格测试，很容易发现如下内容，说明抓包有效：</p><img src="/assets/images/test/tencent/test-1.jpg"><p>手机端滑动到屏幕最下方点击重新测试，发现全部问题在此时获取：</p><img src="/assets/images/test/tencent/test-2.jpg"><p>开始回答问题，方便起见测试中全部选择第一个选项，可以发现对每一题存在两次 POST 请求，一次在答题前发送题号，一次在答题后发送结果，如下：</p><img src="/assets/images/test/tencent/test-3.jpg"> <img src="/assets/images/test/tencent/test-4.jpg"><p>尝试拦截并修改 POST 请求，包括改为错误内容或删除部分字段，发现均可以返回 success 且不影响最终结果：</p><img src="/assets/images/test/tencent/test-5.jpg"> <img src="/assets/images/test/tencent/test-6.jpg"> <img src="/assets/images/test/tencent/test-7.jpg"><p>完成全部题目后会进行一次 POST 请求，内容包括全部六题的选项，服务器将返回结果，如下图所示（为了证实前面 12 次 POST 请求全部无关结果，将它们全部拦截：</p><img src="/assets/images/test/tencent/test-8.jpg"><h2 id="结果获取"><a class="markdownIt-Anchor" href="#结果获取"></a> 结果获取</h2><p>由上述分析可知，计算在服务器进行，我们无从知晓具体的算法，考虑到只有六题且每题只有两个选项，可以使用 Python 枚举全部选项组合并通过 requests 获取结果进行分析。</p><h3 id="实现概述"><a class="markdownIt-Anchor" href="#实现概述"></a> 实现概述</h3><p>观察请求，可以发现请求基于 cookies 鉴权，必须的字段包括 <code>uin</code>、<code>skey</code>、<code>oh_token</code>、<code>oh_sec</code>，请求体为一个如下格式的 JSON：</p><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;q_and_a&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">&#123;</span>
+      <span class="hljs-attr">&quot;question_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;s1&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;answer_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">1</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">&#123;</span>
+      <span class="hljs-attr">&quot;question_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;s2&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;answer_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">1</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">&#123;</span>
+      <span class="hljs-attr">&quot;question_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;s3&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;answer_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">1</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">&#123;</span>
+      <span class="hljs-attr">&quot;question_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;s4&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;answer_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">1</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">&#123;</span>
+      <span class="hljs-attr">&quot;question_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;s5&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;answer_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">1</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">&#123;</span>
+      <span class="hljs-attr">&quot;question_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;s6&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;answer_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">1</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">&#125;</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;activity_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">21</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;req_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><p>请求结果同样是一个 JSON，其形式如下（以斑马和大熊猫为例，实际上 <code>test_detail</code> 字段的值为 JSON 字符串，此处为便于观察将其改为字典形式）。</p><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;ret_code&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;err_msg&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;user repeat test result changed&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;result&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;斑马&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;test_detail&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">&#123;</span>
+    <span class="hljs-attr">&quot;animalURL&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://st.tencent-cloud.com/jax-static/kandian-activity/animals/zebra.png&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalThemeColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#5970ff&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalBgColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#eaeaea&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;personalityColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#5970ff&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;likeColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#d8d9fd&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;dislikeColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#c2ff5d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;friendlyColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#ffb4d1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;friendlyBoxColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#00af5d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://st.tencent-cloud.com/jax-static/kandian-activity/animal/11.png&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalWords&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;燃烧的心&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;爱自由&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;思辨&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;智慧&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;personalityText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">&#123;</span>
+        <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx有一点点&#123;0&#125;，一点点&#123;1&#125;，一点点&#123;2&#125;，一点点&#123;3&#125;！&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;酷&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;美&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pink&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;燃&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;red&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;浪&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blue&quot;</span> <span class="hljs-punctuation">&#125;</span>
+        <span class="hljs-punctuation">]</span>
+      <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx有着纯白的底色，折射世间一切&#123;0&#125;的光彩！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;美好&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;red&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx为&#123;0&#125;套上马鞍，只有“驾”，没有“吁”！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;梦&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;如果xxx的&#123;0&#125;有声音，那会是场海啸！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;自由&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pink&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;likeText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">&#123;</span>
+        <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;仅有&#123;0&#125;的人，是像xxx一样敢遍历人生的&#123;1&#125;！&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3.7%&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pink&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;冒险家&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span> <span class="hljs-punctuation">&#125;</span>
+        <span class="hljs-punctuation">]</span>
+      <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx对世界&#123;0&#125;，感时花溅泪，浪子也心碎！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;共情&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;darkblue&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx&#123;0&#125;感染周遭，朋友像围绕篝火晚会围绕你！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;热情&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;red&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;dislikeText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx总在四处云游，人生slogan是“随时发现&#123;0&#125;”！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;新鲜事&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;red&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;用&#123;0&#125;为生活添彩，斑马成了彩虹小马宝莉！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;冒险&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pink&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;friendlyText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;海豚&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;大象&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;考拉&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;斑马&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;羊驼&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;海参&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;小鹿&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ratio&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3.7&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;testDimensionResult&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ESTP&quot;</span>
+  <span class="hljs-punctuation">&#125;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><pre class="highlight"><code class="json"><span class="hljs-punctuation">&#123;</span>
+  <span class="hljs-attr">&quot;ret_code&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;err_msg&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;user repeat test result changed&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;result&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;大熊猫&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;test_detail&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">&#123;</span>
+    <span class="hljs-attr">&quot;animalURL&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://st.tencent-cloud.com/jax-static/kandian-activity/animals/panda.png&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalThemeColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#02af5d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalBgColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#e7f1f1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;personalityColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#a3d6ff&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;likeColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#3caf63&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;dislikeColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#cdded3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;friendlyColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#ca8f6a&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;friendlyBoxColor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;#0043ef&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://st.tencent-cloud.com/jax-static/kandian-activity/animal/5.png&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;animalWords&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;理性浪漫&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;冷静睿智&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;Who cares&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;personalityText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx看似萌萌哒，实则早已将一切&#123;0&#125;掌控！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;优雅&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;yellow&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx享受当下，对生活生命保持&#123;0&#125;的感知！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;清醒&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;red&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx洞察现实，但依然追寻内心&#123;0&#125;！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;挚爱&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx的生活温柔又&#123;0&#125;，长满了理性浪漫的花朵！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;闪亮&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pink&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;likeText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">&#123;</span>
+        <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx以&#123;0&#125;的人口占比，对抗&#123;1&#125;的既定规则！&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5.3%&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;yellow&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;94.7%&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;white&quot;</span> <span class="hljs-punctuation">&#125;</span>
+        <span class="hljs-punctuation">]</span>
+      <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx精神自由，不结交朋友，只神交&#123;0&#125;的伙伴！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;同频&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;darkblue&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span>
+        <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx不可&#123;0&#125;又追求&#123;1&#125;，你是随机数里的峰值！&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;预测&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;red&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;极致&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;green&quot;</span> <span class="hljs-punctuation">&#125;</span>
+        <span class="hljs-punctuation">]</span>
+      <span class="hljs-punctuation">&#125;</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;dislikeText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;xxx的冷静偶有冷酷的嫌疑，慢热或被视为&#123;0&#125;！&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;孤高&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blue&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">&#123;</span>
+        <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;在一成&#123;0&#125;的生活里，xxx是最大的&#123;1&#125;！&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;replacer&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;不变&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;yellow&quot;</span> <span class="hljs-punctuation">&#125;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">&#123;</span> <span class="hljs-attr">&quot;rep&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;变数&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;red&quot;</span> <span class="hljs-punctuation">&#125;</span>
+        <span class="hljs-punctuation">]</span>
+      <span class="hljs-punctuation">&#125;</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;friendlyText&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;独角兽&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;北极熊&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;豹&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;大熊猫&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;小鹿&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;狮子&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;羊驼&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ratio&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5.3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;testDimensionResult&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ISTP&quot;</span>
+  <span class="hljs-punctuation">&#125;</span>
+<span class="hljs-punctuation">&#125;</span>
+</code></pre><h3 id="选项结果对照表"><a class="markdownIt-Anchor" href="#选项结果对照表"></a> 选项结果对照表</h3><table><thead><tr><th style="text-align:center">id</th><th style="text-align:center">input</th><th style="text-align:center">result</th><th style="text-align:center">id</th><th style="text-align:center">input</th><th style="text-align:center">result</th></tr></thead><tbody><tr><td style="text-align:center">00</td><td style="text-align:center">[1, 1, 1, 1, 1, 1]</td><td style="text-align:center">斑马</td><td style="text-align:center">32</td><td style="text-align:center">[2, 1, 1, 1, 1, 1]</td><td style="text-align:center">斑马</td></tr><tr><td style="text-align:center">01</td><td style="text-align:center">[1, 1, 1, 1, 1, 2]</td><td style="text-align:center">大熊猫</td><td style="text-align:center">33</td><td style="text-align:center">[2, 1, 1, 1, 1, 2]</td><td style="text-align:center">大熊猫</td></tr><tr><td style="text-align:center">02</td><td style="text-align:center">[1, 1, 1, 1, 2, 1]</td><td style="text-align:center">斑马</td><td style="text-align:center">34</td><td style="text-align:center">[2, 1, 1, 1, 2, 1]</td><td style="text-align:center">斑马</td></tr><tr><td style="text-align:center">03</td><td style="text-align:center">[1, 1, 1, 1, 2, 2]</td><td style="text-align:center">大熊猫</td><td style="text-align:center">35</td><td style="text-align:center">[2, 1, 1, 1, 2, 2]</td><td style="text-align:center">大熊猫</td></tr><tr><td style="text-align:center">04</td><td style="text-align:center">[1, 1, 1, 2, 1, 1]</td><td style="text-align:center">小浣熊</td><td style="text-align:center">36</td><td style="text-align:center">[2, 1, 1, 2, 1, 1]</td><td style="text-align:center">小浣熊</td></tr><tr><td style="text-align:center">05</td><td style="text-align:center">[1, 1, 1, 2, 1, 2]</td><td style="text-align:center">猫</td><td style="text-align:center">37</td><td style="text-align:center">[2, 1, 1, 2, 1, 2]</td><td style="text-align:center">猫</td></tr><tr><td style="text-align:center">06</td><td style="text-align:center">[1, 1, 1, 2, 2, 1]</td><td style="text-align:center">小浣熊</td><td style="text-align:center">38</td><td style="text-align:center">[2, 1, 1, 2, 2, 1]</td><td style="text-align:center">小浣熊</td></tr><tr><td style="text-align:center">07</td><td style="text-align:center">[1, 1, 1, 2, 2, 2]</td><td style="text-align:center">猫</td><td style="text-align:center">39</td><td style="text-align:center">[2, 1, 1, 2, 2, 2]</td><td style="text-align:center">猫</td></tr><tr><td style="text-align:center">08</td><td style="text-align:center">[1, 1, 2, 1, 1, 1]</td><td style="text-align:center">豹</td><td style="text-align:center">40</td><td style="text-align:center">[2, 1, 2, 1, 1, 1]</td><td style="text-align:center">豹</td></tr><tr><td style="text-align:center">09</td><td style="text-align:center">[1, 1, 2, 1, 1, 2]</td><td style="text-align:center">考拉</td><td style="text-align:center">41</td><td style="text-align:center">[2, 1, 2, 1, 1, 2]</td><td style="text-align:center">考拉</td></tr><tr><td style="text-align:center">10</td><td style="text-align:center">[1, 1, 2, 1, 2, 1]</td><td style="text-align:center">豹</td><td style="text-align:center">42</td><td style="text-align:center">[2, 1, 2, 1, 2, 1]</td><td style="text-align:center">豹</td></tr><tr><td style="text-align:center">11</td><td style="text-align:center">[1, 1, 2, 1, 2, 2]</td><td style="text-align:center">考拉</td><td style="text-align:center">43</td><td style="text-align:center">[2, 1, 2, 1, 2, 2]</td><td style="text-align:center">考拉</td></tr><tr><td style="text-align:center">12</td><td style="text-align:center">[1, 1, 2, 2, 1, 1]</td><td style="text-align:center">羊驼</td><td style="text-align:center">44</td><td style="text-align:center">[2, 1, 2, 2, 1, 1]</td><td style="text-align:center">羊驼</td></tr><tr><td style="text-align:center">13</td><td style="text-align:center">[1, 1, 2, 2, 1, 2]</td><td style="text-align:center">小鹿</td><td style="text-align:center">45</td><td style="text-align:center">[2, 1, 2, 2, 1, 2]</td><td style="text-align:center">小鹿</td></tr><tr><td style="text-align:center">14</td><td style="text-align:center">[1, 1, 2, 2, 2, 1]</td><td style="text-align:center">羊驼</td><td style="text-align:center">46</td><td style="text-align:center">[2, 1, 2, 2, 2, 1]</td><td style="text-align:center">羊驼</td></tr><tr><td style="text-align:center">15</td><td style="text-align:center">[1, 1, 2, 2, 2, 2]</td><td style="text-align:center">小鹿</td><td style="text-align:center">47</td><td style="text-align:center">[2, 1, 2, 2, 2, 2]</td><td style="text-align:center">小鹿</td></tr><tr><td style="text-align:center">16</td><td style="text-align:center">[1, 2, 1, 1, 1, 1]</td><td style="text-align:center">小火龙</td><td style="text-align:center">48</td><td style="text-align:center">[2, 2, 1, 1, 1, 1]</td><td style="text-align:center">小火龙</td></tr><tr><td style="text-align:center">17</td><td style="text-align:center">[1, 2, 1, 1, 1, 2]</td><td style="text-align:center">章鱼</td><td style="text-align:center">49</td><td style="text-align:center">[2, 2, 1, 1, 1, 2]</td><td style="text-align:center">章鱼</td></tr><tr><td style="text-align:center">18</td><td style="text-align:center">[1, 2, 1, 1, 2, 1]</td><td style="text-align:center">小火龙</td><td style="text-align:center">50</td><td style="text-align:center">[2, 2, 1, 1, 2, 1]</td><td style="text-align:center">小火龙</td></tr><tr><td style="text-align:center">19</td><td style="text-align:center">[1, 2, 1, 1, 2, 2]</td><td style="text-align:center">章鱼</td><td style="text-align:center">51</td><td style="text-align:center">[2, 2, 1, 1, 2, 2]</td><td style="text-align:center">章鱼</td></tr><tr><td style="text-align:center">20</td><td style="text-align:center">[1, 2, 1, 2, 1, 1]</td><td style="text-align:center">独角兽</td><td style="text-align:center">52</td><td style="text-align:center">[2, 2, 1, 2, 1, 1]</td><td style="text-align:center">独角兽</td></tr><tr><td style="text-align:center">21</td><td style="text-align:center">[1, 2, 1, 2, 1, 2]</td><td style="text-align:center">海豚</td><td style="text-align:center">53</td><td style="text-align:center">[2, 2, 1, 2, 1, 2]</td><td style="text-align:center">海豚</td></tr><tr><td style="text-align:center">22</td><td style="text-align:center">[1, 2, 1, 2, 2, 1]</td><td style="text-align:center">独角兽</td><td style="text-align:center">54</td><td style="text-align:center">[2, 2, 1, 2, 2, 1]</td><td style="text-align:center">独角兽</td></tr><tr><td style="text-align:center">23</td><td style="text-align:center">[1, 2, 1, 2, 2, 2]</td><td style="text-align:center">海豚</td><td style="text-align:center">55</td><td style="text-align:center">[2, 2, 1, 2, 2, 2]</td><td style="text-align:center">海豚</td></tr><tr><td style="text-align:center">24</td><td style="text-align:center">[1, 2, 2, 1, 1, 1]</td><td style="text-align:center">狮子</td><td style="text-align:center">56</td><td style="text-align:center">[2, 2, 2, 1, 1, 1]</td><td style="text-align:center">狮子</td></tr><tr><td style="text-align:center">25</td><td style="text-align:center">[1, 2, 2, 1, 1, 2]</td><td style="text-align:center">海参</td><td style="text-align:center">57</td><td style="text-align:center">[2, 2, 2, 1, 1, 2]</td><td style="text-align:center">海参</td></tr><tr><td style="text-align:center">26</td><td style="text-align:center">[1, 2, 2, 1, 2, 1]</td><td style="text-align:center">狮子</td><td style="text-align:center">58</td><td style="text-align:center">[2, 2, 2, 1, 2, 1]</td><td style="text-align:center">狮子</td></tr><tr><td style="text-align:center">27</td><td style="text-align:center">[1, 2, 2, 1, 2, 2]</td><td style="text-align:center">海参</td><td style="text-align:center">59</td><td style="text-align:center">[2, 2, 2, 1, 2, 2]</td><td style="text-align:center">海参</td></tr><tr><td style="text-align:center">28</td><td style="text-align:center">[1, 2, 2, 2, 1, 1]</td><td style="text-align:center">大象</td><td style="text-align:center">60</td><td style="text-align:center">[2, 2, 2, 2, 1, 1]</td><td style="text-align:center">大象</td></tr><tr><td style="text-align:center">29</td><td style="text-align:center">[1, 2, 2, 2, 1, 2]</td><td style="text-align:center">北极熊</td><td style="text-align:center">61</td><td style="text-align:center">[2, 2, 2, 2, 1, 2]</td><td style="text-align:center">北极熊</td></tr><tr><td style="text-align:center">30</td><td style="text-align:center">[1, 2, 2, 2, 2, 1]</td><td style="text-align:center">大象</td><td style="text-align:center">62</td><td style="text-align:center">[2, 2, 2, 2, 2, 1]</td><td style="text-align:center">大象</td></tr><tr><td style="text-align:center">31</td><td style="text-align:center">[1, 2, 2, 2, 2, 2]</td><td style="text-align:center">北极熊</td><td style="text-align:center">63</td><td style="text-align:center">[2, 2, 2, 2, 2, 2]</td><td style="text-align:center">北极熊</td></tr></tbody></table><h2 id="结果的解析"><a class="markdownIt-Anchor" href="#结果的解析"></a> 结果的解析</h2><p>打标签 + 客户端计算结果 + 结果存在随机性的测试玩腻了，偶尔换换口味还不错。</p><h3 id="完整结果列表"><a class="markdownIt-Anchor" href="#完整结果列表"></a> 完整结果列表</h3><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">斑马</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;燃烧的心&#x27;</span>, <span class="hljs-string">&#x27;爱自由&#x27;</span>, <span class="hljs-string">&#x27;思辨&#x27;</span>, <span class="hljs-string">&#x27;智慧&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\有一点点酷，一点点美，一点点燃，一点点浪！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\有着纯白的底色，折射世间一切美好的光彩！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\为梦套上马鞍，只有“驾”，没有“吁”！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">如果\nickname\的自由有声音，那会是场海啸！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">仅有3.7%的人，是像\nickname\一样敢遍历人生的冒险家！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\对世界共情，感时花溅泪，浪子也心碎！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\热情感染周遭，朋友像围绕篝火晚会围绕你！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\总在四处云游，人生slogan是“随时发现新鲜事”！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">用冒险为生活添彩，斑马成了彩虹小马宝莉！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">3.7</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">豹</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;奋斗精神&#x27;</span>, <span class="hljs-string">&#x27;决策力&#x27;</span>, <span class="hljs-string">&#x27;心想事成&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">一年的31536000秒，\nickname\每秒都鲜活而有力！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">必须做，应该做，想要做的事，\nickname\都会做好！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\是“贵人”:能力强，时薪贵的人！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\有CEO般的决策力，永远对选择困难症免疫！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\这样诚实、果敢又珍贵的妙人仅占6%人口！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\是最佳leader，有磁石般凝聚力和一贯的高标准！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的完美主义，将带领同伴奔向更开阔的领地！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">别太紧绷，试着让自己舒服，而非让自己束缚！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">因为\nickname\太高效，所以总有工作量不饱和即视感。</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">6.0</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">北极熊</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;大爱&#x27;</span>, <span class="hljs-string">&#x27;顿悟力&#x27;</span>, <span class="hljs-string">&#x27;真挚&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的世界充满善，一切美好乘着风掉进你心怀！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\待人以真情，至情至性，拥有鼓舞人心的力量！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\有丰富的内心世界，轻盈自如，生命力十足！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\对生命保持觉知，从中淬炼出悟道般的见解！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">像\nickname\一样理想主义又高道德的人竟不到5.7%？！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">苦行般坚持，谁不想亲吻这位苏格拉底的手背？</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\精通治愈的技巧，挂个号聊一聊，灵魂都净化！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">避免外出时因为追随者众多而造成踩踏事件！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">努力活更久吧，\nickname\是古典美德曾经存在的证据！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">5.7</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">大象</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;外交力&#x27;</span>, <span class="hljs-string">&#x27;温暖&#x27;</span>, <span class="hljs-string">&#x27;真诚&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\松弛而平静，轻盈而笃定，似晚风拂面的温柔！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\言语间给人一种力量，一种燃起希望的能力！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\目光长远，喜欢站在未来的角度看问题！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的真诚和童心，让世界如此美丽！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的心灵美若新春，这般魅力仅出现于2.9%的人！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\高贵却不高冷，温和但不温吞，优雅但不优越！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">与\nickname\相处，一定如春日暖阳般和煦！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">风度翩翩令人着迷，小心因被挂念而狂打喷嚏！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">别把所有一肩挑，这对肩颈不是很好！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">2.9</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">大熊猫</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;理性浪漫&#x27;</span>, <span class="hljs-string">&#x27;冷静睿智&#x27;</span>, <span class="hljs-string">&#x27;Who cares&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\看似萌萌哒，实则早已将一切优雅掌控！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\享受当下，对生活生命保持清醒的感知！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\洞察现实，但依然追寻内心挚爱！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的生活温柔又闪亮，长满了理性浪漫的花朵！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\以5.3%的人口占比，对抗94.7%的既定规则！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\精神自由，不结交朋友，只神交同频的伙伴！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\不可预测又追求极致，你是随机数里的峰值！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的冷静偶有冷酷的嫌疑，慢热或被视为孤高！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">在一成不变的生活里，\nickname\是最大的变数！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">5.3</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">独角兽</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;热爱生活&#x27;</span>, <span class="hljs-string">&#x27;前卫艺术&#x27;</span>, <span class="hljs-string">&#x27;真实&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\精灵又鬼马，以一己之力提升全球可爱指数！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\是生活艺术家，与世间万物有着独特的共振！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\感性而柔软，生活的抚摸，都留下深深的触动！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">哲学、音乐、艺术、动物......都是\nickname\的好朋友！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">仅占4.7%的珍稀动物，\nickname\因可爱而被爱！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的创造力是天赋，你的头脑应该申请专利！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\心态开放，你思想的港口，允许全世界流经！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的奇思妙想过于外太空，要勤练习人类语言！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">如果多一点行动力，\nickname\能同登财富榜和可爱榜！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">4.7</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>, <span class="hljs-string">&#x27;鹿&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">海参</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;AI本体&#x27;</span>, <span class="hljs-string">&#x27;最独立&#x27;</span>, <span class="hljs-string">&#x27;多金&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\隐藏的是温、暖、光，展现的是冷、静、酷！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\可以将问题乔装打扮一番，变成机会的样子！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\用冷静智慧开拓前路，内心赤热点燃人心！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\遇事总是超然，面对挑战就变得超燃！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">高处不胜寒，\nickname\这样智慧的聪明蛋仅占人口5.2%！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">聪慧是\nickname\的最大加分项，好看不过是锦上添花！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\轻松计算最优解，人生游戏，你是开挂的存在！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">偶尔要流露人类情绪，免得让人觉得是AI本体！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">算力堪比量子计算机，小心被拉去挖比特币！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">5.2</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">海豚</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;轻软和柔&#x27;</span>, <span class="hljs-string">&#x27;艺术性&#x27;</span>, <span class="hljs-string">&#x27;创造力&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\轻、软、和、柔、缓、温、舒、清、徐！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\是真正的理想主义者，梦里有海，越过星群！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\非常照顾他人的感情，治愈人于无形之中！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\有丰盛的创造力，是美感和哲学的集大成者！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\这样的人全球仅有9.8%，是仅存的浪漫诗人！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">温和舒适，和\nickname\交往就像泡温泉般舒心！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">极浪漫，和\nickname\谈天，就像还原19世纪沙龙聚会！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">避免因脑海里太多哲思而被人认为曲高和寡！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">避免因太贴心，别人过于依赖\nickname\，丧失自理能力！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">9.8</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">考拉</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;正义感&#x27;</span>, <span class="hljs-string">&#x27;超认真&#x27;</span>, <span class="hljs-string">&#x27;理性&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\是浪漫主义认真发呆专业户的快乐专家！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\沉稳如山，但愚公可动摇不了你！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\活得就像旁观者，享受松弛有趣的人生！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">世界喧嚣，\nickname\也能守护住内心的一方净土！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">虽然稀少，但好在像\nickname\这样靠谱的人还有8.1%！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\有奥特曼的正义感，能像相信光一样相信你！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">想要严谨自律地走向成功？\nickname\就是参考答案！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">若认真的人最美丽，那\nickname\便有成万人迷的风险。</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">总是为人奉献，记得领取最佳奉献奖时穿靓点！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">8.1</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">猫</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;艺术家&#x27;</span>, <span class="hljs-string">&#x27;享受微风&#x27;</span>, <span class="hljs-string">&#x27;自由&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\率性洒脱又温柔细腻，在宇宙间自由探险！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\享受滚烫而热烈的人生，简单纯粹不妥协！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\永远精力充沛，如活在极昼的日照中！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">前日、昨日、今天、明日、后日，\nickname\是艺术家！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">像\nickname\一样有敢破常规先锋气质的人，仅有11.7%！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\让人崇拜，你身在哪里，哪里便是艺术家云集的旧金山！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\活在当下，破规则、不流俗的勇气令人激赏！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的头部盛产灵感，是艺术细胞的绝佳培养皿！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">对陈词滥调耐受力低，是\nickname\耳朵常起茧的原因！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">11.7</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">狮子</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;领导力&#x27;</span>, <span class="hljs-string">&#x27;乐观&#x27;</span>, <span class="hljs-string">&#x27;坚定&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">主角中的主角，“英雄”的另一种译名就叫</span> <span class="hljs-string">“\nickname\”！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\由智慧勇气冒险和爱组成，拥有自己的天地！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">一旦看准目标，\nickname\便会到达他人无法极目的高度！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\极具号召力，出场自带BGM，容易搞得激动人心！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\什么都第一，连稀有度都是第一，仅占2.5%！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\温暖而威严，让人感觉幸福又信服！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\执行力绝佳，山崩也无法阻止你到达山巅！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">脖子挂的奖牌太多，偶尔也要注意颈椎问题！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">别太高高在上，幸福大结局，要\nickname\带领大家前往！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">2.5</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;鹿&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">小火龙</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;创造力&#x27;</span>, <span class="hljs-string">&#x27;远见&#x27;</span>, <span class="hljs-string">&#x27;勇于表达&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\危险又迷人，有点上头！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\来自充满创意、自由、好奇心的快乐星球！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\对人性有着敏锐触觉，能将感触化为智慧！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\健忘、笑点低，真是幸福生活的标配呀！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">和\nickname\一样拥有顶尖智慧的人仅占总人口的2.3%！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">循规蹈矩是\nickname\大忌，你有灵气且不按套路出牌！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">和\nickname\做朋友感觉像和一群人做朋友，赚大了！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\总是思辩，智慧满溢同时，偶尔也得看看窗外事！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">永远找寻最新鲜思想，家里缺台形而上的冰箱！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">2.3</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">小鹿</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;充盈幸福&#x27;</span>, <span class="hljs-string">&#x27;信念感&#x27;</span>, <span class="hljs-string">&#x27;可靠&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\温柔坚定，心里满是浪漫的小宇宙！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\谦逊而努力，忠于自己，认真生活！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\总是心怀美好，用身边的爱激励自己无限进步！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\优雅讲礼节，时刻保持身着燕尾服般的体面！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">像\nickname\一样元气满满的人，全世界仅有10.3%！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的温情就像阳光，和你见见有益健康！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\是人型彩蛋，有你的部分，是最精彩片段！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">大包大揽要避免，过于完美太累，试着chill一点！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\对朋友的关怀近乎溺爱，小心把崽子们宠坏！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">10.3</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;独角兽&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">小浣熊</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;松弛人生&#x27;</span>, <span class="hljs-string">&#x27;就是玩儿&#x27;</span>, <span class="hljs-string">&#x27;乐观豁达&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\乐于制造快乐，所到之处“哈哈哈”不绝！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\笑起来像西瓜味的风和橘子色的晚霞！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\美而有趣，希腊雕像和一脸沙雕相快速切换！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\及时行乐，今朝有酒今朝醉，明天开始低消费！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">太少！像\nickname\这样人见人爱的只有8.8%？要越多越好！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\总是在散发快乐，在人群中是光源般的存在！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">乐观和感染力是天赋，“就是玩”的人生，谁不喜欢！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">警惕因为彻夜狂欢而拥有浣熊的黑眼圈！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">因为太多人喜欢，\nickname\愁于大家争风吃醋！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">8.8</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;羊驼&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">羊驼</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;气氛组&#x27;</span>, <span class="hljs-string">&#x27;善美明达&#x27;</span>, <span class="hljs-string">&#x27;共情&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\压力大会“啊啊啊”，但结果总是“哈哈哈”！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\心里很干净，住进来的人很舒服！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\极具观赏性，活得漂亮，就像电影观赏性！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\一直骄傲，一直温柔，一直善良，一直美好！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">仅占8%，却可以领舞92%的人震动全场！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\真是可可爱爱惹人爱，谁见了你都想比心。</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">和\nickname\当朋友是种肯定，所有人都欢迎你光临！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">注意保护视力，小心被周遭聚光灯的闪瞎！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">要习惯酸言酸语，\nickname\正身处一片柠檬树林！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">8.0</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;考拉&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;大熊猫&#x27;</span>, <span class="hljs-string">&#x27;小火龙&#x27;</span>, <span class="hljs-string">&#x27;斑马&#x27;</span>, <span class="hljs-string">&#x27;海参&#x27;</span>, <span class="hljs-string">&#x27;海豚&#x27;</span>, <span class="hljs-string">&#x27;猫&#x27;</span>]
+</code></pre><pre class="highlight"><code class="yml"><span class="hljs-attr">result:</span> <span class="hljs-string">章鱼</span>
+<span class="hljs-attr">animalWords:</span> [<span class="hljs-string">&#x27;哲学创新者&#x27;</span>, <span class="hljs-string">&#x27;独立精神&#x27;</span>, <span class="hljs-string">&#x27;酷且温柔&#x27;</span>]
+
+<span class="hljs-attr">personalityText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\的秘密武器是宇宙级的想象力！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\每悟一理必现于行，每行一事皆从于心！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\用理性驾驭情感，冷峻又热烈，刚毅又浪漫！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\知识分子气质，章鱼绣口一吐，肚里都是墨水！</span>
+
+<span class="hljs-attr">likeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">只应天上有，\nickname\这样脱俗的仙子仅占5.2%的人口！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\看起来波澜不惊，但脑子里装着百家争鸣！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">\nickname\擅长抽象，议题越是高深，越是你思维的乐土！</span>
+
+<span class="hljs-attr">dislikeText:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">形而上世界呆太久，难免成为胡子拉碴哲学家！</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-string">形而上世界呆太久，偶尔也得接触下现实人群！</span>
+
+<span class="hljs-attr">ratio:</span> <span class="hljs-number">5.2</span>
+<span class="hljs-attr">friendlyTextOut:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+<span class="hljs-attr">friendlyTextIn:</span> [<span class="hljs-string">&#x27;北极熊&#x27;</span>, <span class="hljs-string">&#x27;大象&#x27;</span>, <span class="hljs-string">&#x27;小浣熊&#x27;</span>, <span class="hljs-string">&#x27;小鹿&#x27;</span>, <span class="hljs-string">&#x27;狮子&#x27;</span>, <span class="hljs-string">&#x27;章鱼&#x27;</span>, <span class="hljs-string">&#x27;豹&#x27;</span>]
+</code></pre></div><div>Word count: 6.4k</div><div>Reading time: 27min</div><div><div><a href="/archive/2021/06/1">Created 2021-06-23T16:07:05.000Z</a></div></div><div><div><a href="/archive/2021/06/1">Last Modified 2021-06-23T16:07:05.000Z</a></div></div><div><br><br></div></div></content><div><br></div><footer>Copyright © 2021-2023 Chenrt Blog</footer></noscript><div id="app"></div></body></html>
