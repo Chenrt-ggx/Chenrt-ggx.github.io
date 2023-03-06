@@ -1,0 +1,316 @@
+<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 网络攻防技术实验作业 | 编程开发篇</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/496bdeefbc6e"><h1>网络攻防技术实验作业 | 编程开发篇</h1></a><div><div><div><a href="/category/Buaa/1">Buaa</a></div><div><a href="/category/Buaa/Security/1">Security</a></div></div></div><div><div><div><a href="/tag/TCP/1">TCP</a></div><div><a href="/tag/Python/1">Python</a></div></div></div><div><p>[迁移自博客园] | BUAA Web Attack and Defense 2022 Programming</p><span id="more"></span><blockquote><p>所以 Nmap 是怎么区分出 filtered 和 closed 的，我好菜 QAQ。</p></blockquote><h2 id="基于-tcp-全连接的端口扫描"><a class="markdownIt-Anchor" href="#基于-tcp-全连接的端口扫描"></a> 基于 TCP 全连接的端口扫描</h2><h3 id="实验环境"><a class="markdownIt-Anchor" href="#实验环境"></a> 实验环境</h3><p>在 Windows10 本地开发与测试。</p><h3 id="实现原型函数"><a class="markdownIt-Anchor" href="#实现原型函数"></a> 实现原型函数</h3><p>原型函数如下所示：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">import</span> socket
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&#x27;__main__&#x27;</span>:
+    soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    soc.connect((<span class="hljs-string">&#x27;127.0.0.1&#x27;</span>, <span class="hljs-number">8080</span>))
+    soc.close()
+</code></pre><p>分别测试本地开放的端口，本地未开放的端口，远端开放的端口，远端未开放的端口，结果如下：</p><ul><li>本地开放的端口，结果为直接退出。</li><li>本地未开放的端口，结果为出现异常，异常为 <code>ConnectionRefusedError</code>。</li><li>远端开放的端口，结果为直接退出。</li><li>远端未开放的端口，结果为出现异常，异常为 <code>socket.timeout</code>。</li></ul><h3 id="实现完整的端口扫描程序"><a class="markdownIt-Anchor" href="#实现完整的端口扫描程序"></a> 实现完整的端口扫描程序</h3><p>基于原型函数，可以实现检查单个端口是否开放的函数，其中 timeout 为超时阈值：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">check</span>(<span class="hljs-params">port</span>):
+    <span class="hljs-keyword">try</span>:
+        soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        soc.settimeout(timeout)
+        soc.connect((host, port))
+        soc.close()
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+    <span class="hljs-keyword">except</span> ConnectionRefusedError:
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+    <span class="hljs-keyword">except</span> socket.timeout:
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+</code></pre><p>考虑到对于单个远端端口，若此端口没有开放则需要等待直到连接超时，这个过程为秒级；主机的 65535 个端口中大多数没有开放，因此大多数情况下将进行秒级等待，为提高程序性能，采用多线程加速：</p><pre class="highlight"><code class="python">open_list = []
+todo_list = [i <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(offset, <span class="hljs-built_in">min</span>(offset + limit, <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">16</span>))]
+open_mutex, todo_mutex = threading.Lock(), threading.Lock()
+</code></pre><p>工作线程从 <code>todo_list</code> 中取出待测试端口，测试其是否开放，若开放则加入 <code>open_list</code>，直到 <code>todo_list</code> 为空时终止，操作两个列表的过程中可能存在线程安全问题，因此需要加锁：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">worker</span>():
+    <span class="hljs-keyword">while</span> <span class="hljs-literal">True</span>:
+        todo_mutex.acquire()
+        <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(todo_list) == <span class="hljs-number">0</span>:
+            todo_mutex.release()
+            <span class="hljs-keyword">return</span>
+        item = todo_list.pop()
+        todo_mutex.release()
+        <span class="hljs-keyword">if</span> check(item):
+            open_mutex.acquire()
+            open_list.append(item)
+            open_mutex.release()
+</code></pre><p>接下来只需要创建若干线程并全部启动，再等待这些线程全部终止即可，此时的 <code>open_list</code> 即为所求：</p><pre class="highlight"><code class="python">thread_list = [threading.Thread(target=worker, args=()) <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-built_in">min</span>(threads, limit))]
+timestamp_print(<span class="hljs-built_in">str</span>(<span class="hljs-built_in">len</span>(thread_list)) + <span class="hljs-string">&#x27; threads created&#x27;</span>)
+<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> thread_list:
+    i.start()
+timestamp_print(<span class="hljs-built_in">str</span>(<span class="hljs-built_in">len</span>(thread_list)) + <span class="hljs-string">&#x27; threads started&#x27;</span>)
+<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> thread_list:
+    i.join()
+open_list.sort()
+timestamp_print(<span class="hljs-string">&#x27;scan finished, result is: &#x27;</span> + <span class="hljs-built_in">str</span>(open_list))
+<span class="hljs-keyword">return</span> open_list
+</code></pre><p>完整代码如下所示：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">import</span> socket
+<span class="hljs-keyword">import</span> datetime
+<span class="hljs-keyword">import</span> threading
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">timestamp_print</span>(<span class="hljs-params">text</span>):
+    <span class="hljs-built_in">print</span>(<span class="hljs-built_in">str</span>(datetime.datetime.now()).split(<span class="hljs-string">&#x27;.&#x27;</span>)[<span class="hljs-number">0</span>], text, sep=<span class="hljs-string">&#x27;: &#x27;</span>)
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">scan</span>(<span class="hljs-params">host, limit, offset=<span class="hljs-number">1</span>, timeout=<span class="hljs-number">3</span>, threads=<span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">12</span></span>):
+    open_list = []
+    todo_list = [i <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(offset, <span class="hljs-built_in">min</span>(offset + limit, <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">16</span>))]
+    open_mutex, todo_mutex = threading.Lock(), threading.Lock()
+    timestamp_print(<span class="hljs-built_in">str</span>(<span class="hljs-built_in">len</span>(todo_list)) + <span class="hljs-string">&#x27; tasks created&#x27;</span>)
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">check</span>(<span class="hljs-params">port</span>):
+        <span class="hljs-keyword">try</span>:
+            soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            soc.settimeout(timeout)
+            soc.connect((host, port))
+            soc.close()
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+        <span class="hljs-keyword">except</span> ConnectionRefusedError:
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+        <span class="hljs-keyword">except</span> socket.timeout:
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">worker</span>():
+        <span class="hljs-keyword">while</span> <span class="hljs-literal">True</span>:
+            todo_mutex.acquire()
+            <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(todo_list) == <span class="hljs-number">0</span>:
+                todo_mutex.release()
+                <span class="hljs-keyword">return</span>
+            item = todo_list.pop()
+            todo_mutex.release()
+            <span class="hljs-keyword">if</span> check(item):
+                open_mutex.acquire()
+                open_list.append(item)
+                open_mutex.release()
+
+    thread_list = [threading.Thread(target=worker, args=()) <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-built_in">min</span>(threads, limit))]
+    timestamp_print(<span class="hljs-built_in">str</span>(<span class="hljs-built_in">len</span>(thread_list)) + <span class="hljs-string">&#x27; threads created&#x27;</span>)
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> thread_list:
+        i.start()
+    timestamp_print(<span class="hljs-built_in">str</span>(<span class="hljs-built_in">len</span>(thread_list)) + <span class="hljs-string">&#x27; threads started&#x27;</span>)
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> thread_list:
+        i.join()
+    open_list.sort()
+    timestamp_print(<span class="hljs-string">&#x27;scan finished, result is: &#x27;</span> + <span class="hljs-built_in">str</span>(open_list))
+    <span class="hljs-keyword">return</span> open_list
+</code></pre><h3 id="测试端口扫描程序"><a class="markdownIt-Anchor" href="#测试端口扫描程序"></a> 测试端口扫描程序</h3><p>采用两个不同的防火墙配置进行测试，如下所示：</p><img src="/assets/images/buaa-security/dev/config-1.jpg"><p>在服务器内使用 Nmap 工具扫描，结果如下：</p><pre class="highlight"><code class="plain">[root@CRISIS ~]# nmap 127.0.0.1
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-05-17 20:28 CST
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.0000030s latency).
+Not shown: 996 closed tcp ports (reset)
+PORT     STATE SERVICE
+22/tcp   open  ssh
+80/tcp   open  http
+6000/tcp open  X11
+7000/tcp open  afs3-fileserver
+
+Nmap done: 1 IP address (1 host up) scanned in 0.08 seconds
+</code></pre><p>在本地使用 Nmap 工具扫描，结果如下：</p><pre class="highlight"><code class="plain">[chenrt@CRISIS ~]$ nmap xxx.xxx.xxx.xxx
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-05-17 20:29 CST
+Note: Host seems down. If it is really up, but blocking our ping probes, try -Pn
+Nmap done: 1 IP address (0 hosts up) scanned in 3.06 seconds
+</code></pre><p>直接扫描失败，添加 -Pn 选项扫描后结果如下：</p><pre class="highlight"><code class="plain">[chenrt@CRISIS ~]$ nmap xxx.xxx.xxx.xxx -Pn
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-05-17 20:29 CST
+Nmap scan report for xxx.xxx.xxx.xxx
+Host is up (0.0077s latency).
+Not shown: 996 filtered tcp ports (no-response)
+PORT     STATE  SERVICE
+22/tcp   open   ssh
+3389/tcp closed ms-wbt-server
+6000/tcp open   X11
+7000/tcp open   afs3-fileserver
+
+Nmap done: 1 IP address (1 host up) scanned in 6.41 seconds
+</code></pre><p>使用上述端口扫描程序扫描的结果如下：</p><pre class="highlight"><code class="plain">2022-05-17 20:33:06: 65535 tasks created
+2022-05-17 20:33:06: 4096 threads created
+2022-05-17 20:33:06: 4096 threads started
+2022-05-17 20:33:55: scan finished, result is: [22, 6000, 7000]
+</code></pre><p>调整防火墙配置，开放 80 端口，如下所示：</p><img src="/assets/images/buaa-security/dev/config-2.jpg"><p>在服务器内使用 Nmap 工具扫描，结果如下：</p><pre class="highlight"><code class="plain">[root@CRISIS ~]# nmap 127.0.0.1
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-05-17 20:36 CST
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.0000030s latency).
+Not shown: 996 closed tcp ports (reset)
+PORT     STATE SERVICE
+22/tcp   open  ssh
+80/tcp   open  http
+6000/tcp open  X11
+7000/tcp open  afs3-fileserver
+
+Nmap done: 1 IP address (1 host up) scanned in 0.09 seconds
+</code></pre><p>在本地使用 Nmap 工具扫描，结果如下，可见 Nmap 工具似乎会特别关照 80 端口，未开放此端口则需要使用 -Pn 扫描：</p><pre class="highlight"><code class="plain">[chenrt@CRISIS ~]$ nmap xxx.xxx.xxx.xxx -Pn
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-05-17 20:36 CST
+Nmap scan report for xxx.xxx.xxx.xxx
+Host is up (0.0072s latency).
+Not shown: 995 filtered tcp ports (no-response)
+PORT     STATE  SERVICE
+22/tcp   open   ssh
+80/tcp   open   http
+3389/tcp closed ms-wbt-server
+6000/tcp open   X11
+7000/tcp open   afs3-fileserver
+
+Nmap done: 1 IP address (1 host up) scanned in 5.12 seconds
+</code></pre><p>使用上述端口扫描程序扫描的结果如下：</p><pre class="highlight"><code class="plain">2022-05-17 20:38:20: 65535 tasks created
+2022-05-17 20:38:20: 4096 threads created
+2022-05-17 20:38:21: 4096 threads started
+2022-05-17 20:39:09: scan finished, result is: [22, 80, 6000, 7000]
+</code></pre><h2 id="验证码识别"><a class="markdownIt-Anchor" href="#验证码识别"></a> 验证码识别</h2><h3 id="实验环境-2"><a class="markdownIt-Anchor" href="#实验环境-2"></a> 实验环境</h3><p>在 Windows10 本地开发与测试。</p><h3 id="登录过程分析"><a class="markdownIt-Anchor" href="#登录过程分析"></a> 登录过程分析</h3><p>抓包结果如下所示，可以发现登录操作是一个向 <a href="https://m.bjyouth.net/site/login">https://m.bjyouth.net/site/login</a> 的 post 请求：</p><img src="/assets/images/buaa-security/dev/req-1.jpg" width="85%"><p>登录请求的详细内容如下所示，可以发现有四个字段，下面分别分析：</p><ul><li><code>Login[verifyCode]</code> 字段：显然是明文传输的验证码。</li><li><code>_csrf_mobile</code> 字段：显然是用来防御跨站攻击的 csrf token，在 Cookies 里面一找就有。</li><li><code>Login[username]</code> 和 <code>Login[password]</code> 字段：显然是用户名和密码，但不是明文传输。</li></ul><img src="/assets/images/buaa-security/dev/req-2.jpg" width="85%"><p>下面分析 <code>Login[username]</code> 和 <code>Login[password]</code> 字段的编码方式，过程如下：</p><ul><li>根据两个字段内容的字符集和以等号结尾，推断两个字段最后经过一次 base64 编码。由于两个 base64 编码长度相同，编码前内容的长度也应该相同，因此这两个字段不是用户名和密码的直接编码。</li><li>注意到两个编码的长度都是 172，base64 编码前的长度就是 128，熟知这是 RSA 的块长度。由此猜测 <code>Login[username]</code> 和 <code>Login[password]</code> 字段是用户名和密码经过 RSA 加密和 base64 编码得到的，挺多网站都这么干。</li><li>在网页源码里搜索关键字 key，结果如下，可见不但没有混淆还有详细的注释，编写这个页面的程序员相当贴心，即使没有上面的分析也知道 <code>Login[username]</code> 和 <code>Login[password]</code> 字段是咋得到的了。</li><li>最后使用源码中的公钥加密自己的用户名和密码，经验证和请求中抓取到的一致。</li></ul><img src="/assets/images/buaa-security/dev/req-3.jpg" width="85%"><h3 id="登录验证码识别"><a class="markdownIt-Anchor" href="#登录验证码识别"></a> 登录验证码识别</h3><p>经过上述分析，唯一需要解决的就是验证码识别，验证码的形式如下：</p><img src="/assets/images/buaa-security/dev/code.png" width="40%"><p>可见虽然存在噪声，但噪声大多是点的形式而不是线的形式；虽然各个字符字号不完全一致且存在旋转，但并没有强烈的扭曲与变形等处理，考虑通过 <a href="https://github.com/sml2h3/ddddocr">ddddocr 库</a>完成验证码识别：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">do_ocr</span>(<span class="hljs-params">data</span>):
+    <span class="hljs-keyword">return</span> DdddOcr().classification(data)
+</code></pre><p>上述代码可以正常执行，且有一定成功率，但仍可以通过降噪的方式进行优化，具体而言，对于每一个像素，如果其周边像素中，白色的占比超过阈值，就将这一像素设为白色，如此迭代多次：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">de_noise</span>(<span class="hljs-params">img, white, limit=<span class="hljs-number">0.75</span>, total=<span class="hljs-number">5</span></span>):
+    <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(total):
+        <span class="hljs-keyword">for</span> i, j <span class="hljs-keyword">in</span> matrix_for_each(<span class="hljs-built_in">range</span>(img.width), <span class="hljs-built_in">range</span>(img.height)):
+            px = img.getpixel((i, j))
+            <span class="hljs-keyword">if</span> px == white:
+                <span class="hljs-keyword">continue</span>
+            count, select = <span class="hljs-number">0</span>, <span class="hljs-number">0</span>
+            <span class="hljs-keyword">for</span> x, y <span class="hljs-keyword">in</span> matrix_for_each([-<span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>], [-<span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>]):
+                ni, nj = i + x, j + y
+                <span class="hljs-keyword">if</span> <span class="hljs-number">0</span> &lt;= ni &lt; img.width <span class="hljs-keyword">and</span> <span class="hljs-number">0</span> &lt;= nj &lt; img.height:
+                    count += <span class="hljs-number">1</span>
+                    <span class="hljs-keyword">if</span> img.getpixel((ni, nj)) == white:
+                        select += <span class="hljs-number">1</span>
+            <span class="hljs-keyword">if</span> select / count &gt; limit:
+                img.putpixel((i, j), white)
+    <span class="hljs-keyword">return</span> img
+</code></pre><p>经过降噪的图片如下，对比可见，噪点大幅减少：</p><img src="/assets/images/buaa-security/dev/fixed.png" width="40%"><p>此时 <code>do_ocr</code> 函数改为：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">do_ocr</span>(<span class="hljs-params">data</span>):
+    buf = io.BytesIO()
+    de_noise(Image.<span class="hljs-built_in">open</span>(io.BytesIO(data)), (<span class="hljs-number">250</span>, <span class="hljs-number">250</span>, <span class="hljs-number">250</span>)).save(buf, <span class="hljs-built_in">format</span>=<span class="hljs-string">&#x27;PNG&#x27;</span>)
+    <span class="hljs-keyword">return</span> DdddOcr().classification(buf.getvalue())
+</code></pre><p>完整代码如下：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">import</span> io
+<span class="hljs-keyword">from</span> PIL <span class="hljs-keyword">import</span> Image
+<span class="hljs-keyword">from</span> ddddocr <span class="hljs-keyword">import</span> DdddOcr
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">matrix_for_each</span>(<span class="hljs-params">x, y</span>):
+    result = []
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> x:
+        <span class="hljs-keyword">for</span> j <span class="hljs-keyword">in</span> y:
+            result.append((i, j))
+    <span class="hljs-keyword">return</span> result
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">de_noise</span>(<span class="hljs-params">img, white, limit=<span class="hljs-number">0.75</span>, total=<span class="hljs-number">5</span></span>):
+    <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(total):
+        <span class="hljs-keyword">for</span> i, j <span class="hljs-keyword">in</span> matrix_for_each(<span class="hljs-built_in">range</span>(img.width), <span class="hljs-built_in">range</span>(img.height)):
+            px = img.getpixel((i, j))
+            <span class="hljs-keyword">if</span> px == white:
+                <span class="hljs-keyword">continue</span>
+            count, select = <span class="hljs-number">0</span>, <span class="hljs-number">0</span>
+            <span class="hljs-keyword">for</span> x, y <span class="hljs-keyword">in</span> matrix_for_each([-<span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>], [-<span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>]):
+                ni, nj = i + x, j + y
+                <span class="hljs-keyword">if</span> <span class="hljs-number">0</span> &lt;= ni &lt; img.width <span class="hljs-keyword">and</span> <span class="hljs-number">0</span> &lt;= nj &lt; img.height:
+                    count += <span class="hljs-number">1</span>
+                    <span class="hljs-keyword">if</span> img.getpixel((ni, nj)) == white:
+                        select += <span class="hljs-number">1</span>
+            <span class="hljs-keyword">if</span> select / count &gt; limit:
+                img.putpixel((i, j), white)
+    <span class="hljs-keyword">return</span> img
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">do_ocr</span>(<span class="hljs-params">data</span>):
+    buf = io.BytesIO()
+    de_noise(Image.<span class="hljs-built_in">open</span>(io.BytesIO(data)), (<span class="hljs-number">250</span>, <span class="hljs-number">250</span>, <span class="hljs-number">250</span>)).save(buf, <span class="hljs-built_in">format</span>=<span class="hljs-string">&#x27;PNG&#x27;</span>)
+    <span class="hljs-keyword">with</span> <span class="hljs-built_in">open</span>(<span class="hljs-string">&#x27;fixed.png&#x27;</span>, <span class="hljs-string">&#x27;wb&#x27;</span>) <span class="hljs-keyword">as</span> file:
+        file.write(buf.getvalue())
+    <span class="hljs-keyword">return</span> DdddOcr().classification(buf.getvalue())
+</code></pre><h3 id="登录脚本实现"><a class="markdownIt-Anchor" href="#登录脚本实现"></a> 登录脚本实现</h3><p>实现获取 RSA 公钥：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_utils</span>():
+    request = requests.get(url=<span class="hljs-string">&#x27;https://m.bjyouth.net/site/login&#x27;</span>)
+    pubkey = <span class="hljs-string">&#x27;\n&#x27;</span>.join([i <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> re.findall(<span class="hljs-string">&#x27;pubkey \\+?= \&#x27;(.*?)\&#x27;&#x27;</span>, request.text)])
+    rsa_key = rsa.PublicKey.load_pkcs1_openssl_pem(pubkey.encode())
+    <span class="hljs-keyword">return</span> rsa_key
+</code></pre><p>实现获取验证码并识别：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_code</span>(<span class="hljs-params">session</span>):
+    request = session.get(url=<span class="hljs-string">&#x27;https://m.bjyouth.net/site/login&#x27;</span>)
+    csrf_token = requests.utils.dict_from_cookiejar(request.cookies)[<span class="hljs-string">&#x27;_csrf_mobile&#x27;</span>]
+    <span class="hljs-keyword">match</span> = re.search(<span class="hljs-string">&#x27;src=\&quot;(/site/captcha.+)\&quot; alt=\&quot;验证码\&quot;&#x27;</span>, request.text)
+    request = session.get(<span class="hljs-string">&#x27;https://m.bjyouth.net&#x27;</span> + <span class="hljs-keyword">match</span>.group(<span class="hljs-number">1</span>))
+    <span class="hljs-keyword">return</span> csrf_token, do_ocr(request.content)
+</code></pre><p>实现登录过程：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">login</span>(<span class="hljs-params">username, password</span>):
+    rsa_key = get_utils()
+    <span class="hljs-keyword">while</span> <span class="hljs-literal">True</span>:
+        session = requests.session()
+        session.timeout = <span class="hljs-number">5</span>
+        session.headers.update(&#123;
+            <span class="hljs-string">&#x27;User-Agent&#x27;</span>: <span class="hljs-string">&#x27;Y.J.Aickson&#x27;</span>
+        &#125;)
+        csrf_token, code = get_code(session)
+        request = session.post(<span class="hljs-string">&#x27;https://m.bjyouth.net/site/login&#x27;</span>, data=&#123;
+            <span class="hljs-string">&#x27;_csrf_mobile&#x27;</span>: csrf_token,
+            <span class="hljs-string">&#x27;Login[username]&#x27;</span>: base64.b64encode(rsa.encrypt(username.encode(), rsa_key)).decode(),
+            <span class="hljs-string">&#x27;Login[password]&#x27;</span>: base64.b64encode(rsa.encrypt(password.encode(), rsa_key)).decode(),
+            <span class="hljs-string">&#x27;Login[verifyCode]&#x27;</span>: code
+        &#125;)
+        <span class="hljs-keyword">if</span> request.text == <span class="hljs-string">&#x27;8&#x27;</span>:
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;识别的验证码错误，重试中&#x27;</span>)
+            <span class="hljs-keyword">continue</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-string">&#x27;fail&#x27;</span> <span class="hljs-keyword">in</span> request.text:
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;登录失败&#x27;</span>)
+            exit(<span class="hljs-number">0</span>)
+        <span class="hljs-keyword">return</span> session
+</code></pre><p>完整代码如下：</p><pre class="highlight"><code class="python"><span class="hljs-keyword">import</span> re
+<span class="hljs-keyword">import</span> rsa
+<span class="hljs-keyword">import</span> json
+<span class="hljs-keyword">import</span> base64
+<span class="hljs-keyword">import</span> requests
+<span class="hljs-keyword">import</span> requests.utils
+<span class="hljs-keyword">from</span> image_tools <span class="hljs-keyword">import</span> do_ocr
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_user_info</span>(<span class="hljs-params">aim</span>):
+    <span class="hljs-keyword">with</span> <span class="hljs-built_in">open</span>(<span class="hljs-string">&#x27;./login/config.json&#x27;</span>, <span class="hljs-string">&#x27;r&#x27;</span>) <span class="hljs-keyword">as</span> file:
+        config = json.loads(file.read())
+    <span class="hljs-keyword">if</span> config.get(aim + <span class="hljs-string">&#x27;_&#x27;</span> + <span class="hljs-string">&#x27;username&#x27;</span>) <span class="hljs-keyword">and</span> config.get(aim + <span class="hljs-string">&#x27;_&#x27;</span> + <span class="hljs-string">&#x27;password&#x27;</span>):
+        username = base64.b64decode(config[aim + <span class="hljs-string">&#x27;_&#x27;</span> + <span class="hljs-string">&#x27;username&#x27;</span>].encode()).decode()
+        password = base64.b64decode(config[aim + <span class="hljs-string">&#x27;_&#x27;</span> + <span class="hljs-string">&#x27;password&#x27;</span>].encode()).decode()
+        <span class="hljs-keyword">return</span> username, password
+    <span class="hljs-keyword">else</span>:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;get username or password failed&#x27;</span>)
+        exit(<span class="hljs-number">0</span>)
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_utils</span>():
+    request = requests.get(url=<span class="hljs-string">&#x27;https://m.bjyouth.net/site/login&#x27;</span>)
+    pubkey = <span class="hljs-string">&#x27;\n&#x27;</span>.join([i <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> re.findall(<span class="hljs-string">&#x27;pubkey \\+?= \&#x27;(.*?)\&#x27;&#x27;</span>, request.text)])
+    rsa_key = rsa.PublicKey.load_pkcs1_openssl_pem(pubkey.encode())
+    <span class="hljs-keyword">return</span> rsa_key
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_code</span>(<span class="hljs-params">session</span>):
+    request = session.get(url=<span class="hljs-string">&#x27;https://m.bjyouth.net/site/login&#x27;</span>)
+    csrf_token = requests.utils.dict_from_cookiejar(request.cookies)[<span class="hljs-string">&#x27;_csrf_mobile&#x27;</span>]
+    <span class="hljs-keyword">match</span> = re.search(<span class="hljs-string">&#x27;src=\&quot;(/site/captcha.+)\&quot; alt=\&quot;验证码\&quot;&#x27;</span>, request.text)
+    request = session.get(<span class="hljs-string">&#x27;https://m.bjyouth.net&#x27;</span> + <span class="hljs-keyword">match</span>.group(<span class="hljs-number">1</span>))
+    <span class="hljs-keyword">with</span> <span class="hljs-built_in">open</span>(<span class="hljs-string">&#x27;code.png&#x27;</span>, <span class="hljs-string">&#x27;wb&#x27;</span>) <span class="hljs-keyword">as</span> file:
+        file.write(request.content)
+    <span class="hljs-keyword">return</span> csrf_token, do_ocr(request.content)
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">login</span>(<span class="hljs-params">username, password</span>):
+    rsa_key = get_utils()
+    <span class="hljs-keyword">while</span> <span class="hljs-literal">True</span>:
+        session = requests.session()
+        session.timeout = <span class="hljs-number">5</span>
+        session.headers.update(&#123;
+            <span class="hljs-string">&#x27;User-Agent&#x27;</span>: <span class="hljs-string">&#x27;Y.J.Aickson&#x27;</span>
+        &#125;)
+        csrf_token, code = get_code(session)
+        request = session.post(<span class="hljs-string">&#x27;https://m.bjyouth.net/site/login&#x27;</span>, data=&#123;
+            <span class="hljs-string">&#x27;_csrf_mobile&#x27;</span>: csrf_token,
+            <span class="hljs-string">&#x27;Login[username]&#x27;</span>: base64.b64encode(rsa.encrypt(username.encode(), rsa_key)).decode(),
+            <span class="hljs-string">&#x27;Login[password]&#x27;</span>: base64.b64encode(rsa.encrypt(password.encode(), rsa_key)).decode(),
+            <span class="hljs-string">&#x27;Login[verifyCode]&#x27;</span>: code
+        &#125;)
+        <span class="hljs-keyword">if</span> request.text == <span class="hljs-string">&#x27;8&#x27;</span>:
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;识别的验证码错误，重试中&#x27;</span>)
+            <span class="hljs-keyword">continue</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-string">&#x27;fail&#x27;</span> <span class="hljs-keyword">in</span> request.text:
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;登录失败&#x27;</span>)
+            exit(<span class="hljs-number">0</span>)
+        <span class="hljs-keyword">return</span> session
+
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">main</span>():
+    username, password = get_user_info(<span class="hljs-string">&#x27;bjyouth&#x27;</span>)
+    login(username, password)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;登录成功&#x27;</span>)
+
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&#x27;__main__&#x27;</span>:
+    main()
+</code></pre></div><div>Word count: 2.9k</div><div>Reading time: 14min</div><div><div><a href="/archive/2022/05/1">Created 2022-05-28T13:14:30.000Z</a></div></div><div><div><a href="/archive/2022/05/1">Last Modified 2022-05-28T13:14:30.000Z</a></div></div><div><br><br></div></div></content><div><br></div><footer>Copyright © 2021-2023 Chenrt Blog</footer></noscript><div id="app"></div></body></html>

@@ -1,0 +1,248 @@
+<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 网络攻防技术实验作业 | 工具配置与使用篇（下）</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/44ceaca393a3"><h1>网络攻防技术实验作业 | 工具配置与使用篇（下）</h1></a><div><div><div><a href="/category/Buaa/1">Buaa</a></div><div><a href="/category/Buaa/Security/1">Security</a></div></div></div><div><div><div><a href="/tag/Snort/1">Snort</a></div><div><a href="/tag/Barnyard2/1">Barnyard2</a></div><div><a href="/tag/PHP/1">PHP</a></div></div></div><div><p>[迁移自博客园] | BUAA Web Attack and Defense 2022 Tool Configuration and Use</p><span id="more"></span><h2 id="snort-barnyard2-base-的安装与配置"><a class="markdownIt-Anchor" href="#snort-barnyard2-base-的安装与配置"></a> Snort + Barnyard2 + BASE 的安装与配置</h2><h3 id="实验环境"><a class="markdownIt-Anchor" href="#实验环境"></a> 实验环境</h3><p>在 Ubuntu 20.04 中配置，测试采用了 Kali Linux Rolling x 虚拟机和 Windows10 物理机。</p><h3 id="安装与配置-snort"><a class="markdownIt-Anchor" href="#安装与配置-snort"></a> 安装与配置 Snort</h3><p>安装基本环境：</p><pre class="highlight"><code class="plain">sudo apt-get install -y build-essential net-tools
+sudo apt-get install -y libpcap-dev libpcre3-dev libdumbnet-dev
+sudo apt-get install -y bison flex
+</code></pre><p>解压 DAQ 并编译安装：</p><pre class="highlight"><code class="plain">tar -xvzf daq-2.0.7.tar.gz
+cd daq-2.0.7
+./configure
+make
+sudo make install
+</code></pre><p>安装 Snort 依赖的包：</p><pre class="highlight"><code class="plain">sudo apt-get install -y zlib1g-dev liblzma-dev openssl libssl-dev
+</code></pre><p>解压 Snort 并编译安装：</p><pre class="highlight"><code class="plain">tar -xvzf snort-2.9.19.tar.gz
+cd snort-2.9.19
+./configure --enable-sourcefire --disable-open-appid
+make
+sudo make install
+</code></pre><p>更新与链接共享库：</p><pre class="highlight"><code class="plain">sudo ldconfig
+sudo ln -s /usr/local/bin/snort /usr/sbin/snort
+</code></pre><p>简单测试 Snort：</p><pre class="highlight"><code class="plain">snort -V
+</code></pre><img src="/assets/images/buaa-security/snort/install-1.png" width="85%"><p>为 Snort 创建用户和组：</p><pre class="highlight"><code class="plain">sudo groupadd snort
+sudo useradd snort -r -s /sbin/nologin -c SNORT_IDS -g snort
+
+sudo mkdir /etc/snort
+sudo mkdir /etc/snort/rules
+sudo mkdir /etc/snort/rules/iplists
+sudo mkdir /etc/snort/preproc_rules
+sudo mkdir /usr/local/lib/snort_dynamicrules
+sudo mkdir /etc/snort/so_rules
+
+sudo touch /etc/snort/rules/iplists/black_list.rules
+sudo touch /etc/snort/rules/iplists/white_list.rules
+sudo touch /etc/snort/rules/local.rules
+sudo touch /etc/snort/sid-msg.map
+
+sudo mkdir /var/log/snort
+sudo mkdir /var/log/snort/archived_logs
+
+sudo chmod -R 5775 /etc/snort
+sudo chmod -R 5775 /var/log/snort
+sudo chmod -R 5775 /var/log/snort/archived_logs
+sudo chmod -R 5775 /etc/snort/so_rules
+sudo chmod -R 5775 /usr/local/lib/snort_dynamicrules
+
+sudo chown -R snort:snort /etc/snort
+sudo chown -R snort:snort /var/log/snort
+sudo chown -R snort:snort /usr/local/lib/snort_dynamicrules
+</code></pre><p>复制配置文件和预处理器：</p><pre class="highlight"><code class="plain">cd ~/snort-2.9.19/etc/
+sudo cp *.conf* /etc/snort
+sudo cp *.map /etc/snort
+sudo cp *.dtd /etc/snort
+cd ~/snort-2.9.19/src/dynamic-preprocessors/build/usr/local/lib/snort_dynamicpreprocessor/
+sudo cp * /usr/local/lib/snort_dynamicpreprocessor/
+</code></pre><p>修改 Snort 配置：</p><pre class="highlight"><code class="plain">sudo gedit /etc/snort/snort.conf
+</code></pre><ul><li><p>修改局域网配置：</p><pre class="highlight"><code class="plain"># Setup the network addresses you are protecting
+ipvar HOME_NET 192.168.40.0/24
+</code></pre></li><li><p>修改文件路径：</p><pre class="highlight"><code class="plain"># Path to your rules files (this can be a relative path)
+# Note for Windows users:  You are advised to make this an absolute path,
+# such as:  c:\snort\rules
+var RULE_PATH /etc/snort/rules
+var SO_RULE_PATH /etc/snort/so_rules
+var PREPROC_RULE_PATH /etc/snort/preproc_rules
+
+# If you are using reputation preprocessor set these
+# Currently there is a bug with relative paths, they are relative to where snort is
+# not relative to snort.conf like the above variables
+# This is completely inconsistent with how other vars work, BUG 89986
+# Set the absolute path appropriately
+var WHITE_LIST_PATH /etc/snort/rules/iplists
+var BLACK_LIST_PATH /etc/snort/rules/iplists
+</code></pre></li><li><p>注释内置的规则：</p><pre class="highlight"><code class="plain"># include $RULE_PATH/app-detect.rules
+# include $RULE_PATH/attack-responses.rules
+# include $RULE_PATH/backdoor.rules
+# include $RULE_PATH/bad-traffic.rules
+# include $RULE_PATH/blacklist.rules
+# include $RULE_PATH/botnet-cnc.rules
+# include $RULE_PATH/browser-chrome.rules
+# include $RULE_PATH/browser-firefox.rules
+# include $RULE_PATH/browser-ie.rules
+# include $RULE_PATH/browser-other.rules
+# include $RULE_PATH/browser-plugins.rules
+# include $RULE_PATH/browser-webkit.rules
+# include $RULE_PATH/chat.rules
+# include $RULE_PATH/content-replace.rules
+# include $RULE_PATH/ddos.rules
+# include $RULE_PATH/dns.rules
+# include $RULE_PATH/dos.rules
+# include $RULE_PATH/experimental.rules
+# include $RULE_PATH/exploit-kit.rules
+# include $RULE_PATH/exploit.rules
+# include $RULE_PATH/file-executable.rules
+# include $RULE_PATH/file-flash.rules
+# include $RULE_PATH/file-identify.rules
+# include $RULE_PATH/file-image.rules
+# include $RULE_PATH/file-multimedia.rules
+# include $RULE_PATH/file-office.rules
+# include $RULE_PATH/file-other.rules
+# include $RULE_PATH/file-pdf.rules
+# include $RULE_PATH/finger.rules
+# include $RULE_PATH/ftp.rules
+# include $RULE_PATH/icmp-info.rules
+# include $RULE_PATH/icmp.rules
+# include $RULE_PATH/imap.rules
+# include $RULE_PATH/indicator-compromise.rules
+# include $RULE_PATH/indicator-obfuscation.rules
+# include $RULE_PATH/indicator-shellcode.rules
+# include $RULE_PATH/info.rules
+# include $RULE_PATH/malware-backdoor.rules
+# include $RULE_PATH/malware-cnc.rules
+# include $RULE_PATH/malware-other.rules
+# include $RULE_PATH/malware-tools.rules
+# include $RULE_PATH/misc.rules
+# include $RULE_PATH/multimedia.rules
+# include $RULE_PATH/mysql.rules
+# include $RULE_PATH/netbios.rules
+# include $RULE_PATH/nntp.rules
+# include $RULE_PATH/oracle.rules
+# include $RULE_PATH/os-linux.rules
+# include $RULE_PATH/os-other.rules
+# include $RULE_PATH/os-solaris.rules
+# include $RULE_PATH/os-windows.rules
+# include $RULE_PATH/other-ids.rules
+# include $RULE_PATH/p2p.rules
+# include $RULE_PATH/phishing-spam.rules
+# include $RULE_PATH/policy-multimedia.rules
+# include $RULE_PATH/policy-other.rules
+# include $RULE_PATH/policy.rules
+# include $RULE_PATH/policy-social.rules
+# include $RULE_PATH/policy-spam.rules
+# include $RULE_PATH/pop2.rules
+# include $RULE_PATH/pop3.rules
+# include $RULE_PATH/protocol-finger.rules
+# include $RULE_PATH/protocol-ftp.rules
+# include $RULE_PATH/protocol-icmp.rules
+# include $RULE_PATH/protocol-imap.rules
+# include $RULE_PATH/protocol-pop.rules
+# include $RULE_PATH/protocol-services.rules
+# include $RULE_PATH/protocol-voip.rules
+# include $RULE_PATH/pua-adware.rules
+# include $RULE_PATH/pua-other.rules
+# include $RULE_PATH/pua-p2p.rules
+# include $RULE_PATH/pua-toolbars.rules
+# include $RULE_PATH/rpc.rules
+# include $RULE_PATH/rservices.rules
+# include $RULE_PATH/scada.rules
+# include $RULE_PATH/scan.rules
+# include $RULE_PATH/server-apache.rules
+# include $RULE_PATH/server-iis.rules
+# include $RULE_PATH/server-mail.rules
+# include $RULE_PATH/server-mssql.rules
+# include $RULE_PATH/server-mysql.rules
+# include $RULE_PATH/server-oracle.rules
+# include $RULE_PATH/server-other.rules
+# include $RULE_PATH/server-webapp.rules
+# include $RULE_PATH/shellcode.rules
+# include $RULE_PATH/smtp.rules
+# include $RULE_PATH/snmp.rules
+# include $RULE_PATH/specific-threats.rules
+# include $RULE_PATH/spyware-put.rules
+# include $RULE_PATH/sql.rules
+# include $RULE_PATH/telnet.rules
+# include $RULE_PATH/tftp.rules
+# include $RULE_PATH/virus.rules
+# include $RULE_PATH/voip.rules
+# include $RULE_PATH/web-activex.rules
+# include $RULE_PATH/web-attacks.rules
+# include $RULE_PATH/web-cgi.rules
+# include $RULE_PATH/web-client.rules
+# include $RULE_PATH/web-coldfusion.rules
+# include $RULE_PATH/web-frontpage.rules
+# include $RULE_PATH/web-iis.rules
+# include $RULE_PATH/web-misc.rules
+# include $RULE_PATH/web-php.rules
+# include $RULE_PATH/x11.rules
+</code></pre></li></ul><p>配置测试用规则：</p><pre class="highlight"><code class="plain">sudo gedit /etc/snort/rules/local.rules
+</code></pre><ul><li><p>监控 ICMP 报文：</p><pre class="highlight"><code class="plain">alert icmp any any -&gt; $HOME_NET any (msg:&quot;ICMP Test detected!!!&quot;; classtype:icmp-event; sid:10000001; rev:001; GID:1; )
+</code></pre></li><li><p>测试配置：</p><pre class="highlight"><code class="plain">sudo snort -A console -q -u snort -g snort -c /etc/snort/snort.conf -i ens33
+</code></pre></li></ul><p>在 Windows 物理机 ping 虚拟机：</p><img src="/assets/images/buaa-security/snort/install-2.jpg" width="70%"><p>在虚拟机观察到结果：</p><img src="/assets/images/buaa-security/snort/install-3.png" width="85%"><h3 id="安装与配置-barnyard2"><a class="markdownIt-Anchor" href="#安装与配置-barnyard2"></a> 安装与配置 Barnyard2</h3><p>更新包管理器并安装 Barnyard2 依赖的包：</p><pre class="highlight"><code class="plain">sudo apt-get update
+sudo apt-get install -y mysql-server libmysqlclient-dev mysql-client autoconf libtool
+</code></pre><p>解压 Barnyard2 并编译安装：</p><pre class="highlight"><code class="plain">unzip barnyard2-master.zip
+cd barnyard2-master
+autoreconf -fvi -I ./m4
+sudo ln -s /usr/include/dumbnet.h /usr/include/dnet.h
+sudo ldconfig
+./configure --with-mysql --with-mysql-libraries=/usr/lib/x86_64-linux-gnu
+make
+sudo make install
+</code></pre><p>如果不出意外，会遇到以下问题，可修改 Barnyard2 源码解决，见<a href="https://blog.csdn.net/qq_45944626/article/details/121840844">此博客</a>：</p><pre class="highlight"><code class="plain">spo_alert_fwsam.c:118:13: error: two or more data types in declaration specifiers
+  118 | typedef int SOCKET;
+      |             ^~~~~~
+
+In file included from spo_database.c:103:
+../output-plugins/spo_database.h:360:5: error: unknown type name ‘my_bool’
+  360 |     my_bool mysql_reconnect; /* We will handle it via the api. */
+      |     ^~~~~~~
+</code></pre><p>复制配置文件：</p><pre class="highlight"><code class="plain">cd ~/barnyard2-master
+sudo cp etc/barnyard2.conf /etc/snort
+sudo mkdir /var/log/barnyard2
+sudo chown snort.snort /var/log/barnyard2
+sudo touch /var/log/snort/barnyard2.waldo
+sudo chown snort.snort /var/log/snort/barnyard2.waldo
+</code></pre><p>配置 MySQL 并为 Barnyard2 创建账户：</p><pre class="highlight"><code class="plain">create database snort;
+use snort;
+source /home/chenrt/barnyard2-master/schemas/create_mysql;
+create user 'snort'@'localhost' identified by 'password';
+grant create, insert, select, delete, update on snort.* to 'snort'@'localhost';
+</code></pre><p>在 Linux 下如果使用了 MariaDB，且 Barnyard2 版本为 2.1.13，会出现以下问题，原因是列名和保留字冲突，处理见<a href="https://www.linuxquestions.org/questions/slackware-14/barnyard2-setup-4175616443/">此问题</a>：</p><pre class="highlight"><code class="plain">ERROR 1064 (42000) at line 53 in file: '/usr/src/create_mysql': You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'ref_system_id INT UNSIGNED NOT NULL, ref_ta...' at line 2
+ERROR 1064 (42000) at line 58 in file: '/usr/src/create_mysql': You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'ref_system_id INT UNSIGNED NOT NULL AUTO_INCREMENT, ...' at line 1
+</code></pre><p>配置 Snort 以适应 Barnyard2：</p><pre class="highlight"><code class="plain">sudo gedit /etc/snort/snort.conf
+</code></pre><ul><li><p>修改输出文件的配置：</p><pre class="highlight"><code class="plain"># unified2
+# Recommended for most installs
+# output unified2: filename merged.log, limit 128, nostamp, mpls_event_types, vlan_event_types
+output unified2: filename snort.u2, limit 128
+</code></pre></li></ul><p>配置 Barnyard2 以连接 SQL：</p><pre class="highlight"><code class="plain">sudo gedit /etc/snort/barnyard2.conf
+</code></pre><ul><li><p>修改用户名和密码：</p><pre class="highlight"><code class="plain">output database: log, mysql, user=snort password=password dbname=snort host=localhost
+</code></pre></li><li><p>修改配置文件权限：</p><pre class="highlight"><code class="plain">sudo chmod o-r /etc/snort/barnyard2.conf
+</code></pre></li></ul><p>配置 Barnyard2 以读取 Snort 的输出：</p><pre class="highlight"><code class="plain">sudo gedit /etc/snort/sid-msg.map
+</code></pre><ul><li><p>写入以下内容：</p><pre class="highlight"><code class="plain">1 || 10000001 || 001 || icmp-event || 0 || ICMP Test detected || url,tools.ietf.org/html/rfc792
+</code></pre></li></ul><p>启动 Snort 和 Barnyard2 测试：</p><pre class="highlight"><code class="plain">sudo snort -q -u snort -g snort -c /etc/snort/snort.conf -i ens33
+</code></pre><pre class="highlight"><code class="plain">sudo barnyard2 -c /etc/snort/barnyard2.conf -d /var/log/snort -f snort.u2 -w /var/log/snort/barnyard2.waldo -g snort -u snort
+</code></pre><p>在 Windows 物理机 ping 虚拟机，Snort 的 log 文件如下：</p><img src="/assets/images/buaa-security/snort/install-4.png" width="85%"><p>数据库被 Barnyard2 更新：</p><img src="/assets/images/buaa-security/snort/install-5.png" width="85%"><h3 id="安装与配置-base"><a class="markdownIt-Anchor" href="#安装与配置-base"></a> 安装与配置 BASE</h3><p>配置 Apache2 和 PHP 5.6 环境：</p><pre class="highlight"><code class="plain">sudo apt-get install -y apache2
+sudo add-apt-repository ppa:ondrej/php
+sudo apt-get update
+sudo apt-get install -y libapache2-mod-php5.6 php5.6 php5.6-common php5.6-gd php5.6-cli php5.6-xml php5.6-mysql
+sudo apt-get install -y php-pear libphp-adodb
+</code></pre><p>Apache2 安装成功：</p><img src="/assets/images/buaa-security/snort/install-6.png" width="85%"><p>PHP 5.6 安装成功：</p><img src="/assets/images/buaa-security/snort/install-7.png" width="85%"><p>PHP 安装 BASE 依赖的包：</p><pre class="highlight"><code class="plain">sudo pear config-set preferred_state alpha
+sudo pear channel-update pear.php.net
+sudo pear install --alldeps Image_Color Image_Canvas Image_Graph
+</code></pre><p>调整 PHP 的配置：</p><pre class="highlight"><code class="plain">sudo gedit /etc/php/5.6/apache2/php.ini
+</code></pre><ul><li><p>修改报错条件：</p><pre class="highlight"><code class="plain">error_reporting = E_ALL &amp; ~E_NOTICE
+</code></pre></li></ul><p>调整 Apache 配置：</p><pre class="highlight"><code class="plain">sudo gedit /etc/apache2/apache2.conf
+</code></pre><ul><li><p>修改 BASE 目录的规则：</p><pre class="highlight"><code class="plain">&lt;Directory /var/www/html/base&gt;
+  AllowOverride All
+  Require all granted
+&lt;/Directory&gt;
+</code></pre></li></ul><p>重启 Apache 服务：</p><pre class="highlight"><code class="plain">sudo service apache2 restart
+</code></pre><p>解压 BASE 到 Apache 目录，并配置权限：</p><pre class="highlight"><code class="plain">tar -xzvf base-1.4.5.tar.gz
+sudo mv base-1.4.5 /var/www/html/base
+sudo chown -R www-data:www-data /var/www/html/base
+sudo chmod o+w /var/www/html/base
+sudo service apache2 restart
+</code></pre><p>访问 localhost，在初始化配置时被卡在第二步，报错是数据库无法连接：</p><img src="/assets/images/buaa-security/snort/install-8.png" width="85%"><p>网上死活找不到资料，于是翻出源码，打开 adodb 的 debug 模式：</p><img src="/assets/images/buaa-security/snort/install-9.png" width="85%"><p>根据报错发现原因在于新版 MySQL 调整了密码的 Hash 算法，修改如下，参考了<a href="https://www.jianshu.com/p/f235813c3c3a">此博客</a>：</p><ul><li><p>在 <code>/etc/mysql/my.cnf</code> 中添加：</p><pre class="highlight"><code class="plain">[mysqld]
+default_authentication_plugin=mysql_native_password
+</code></pre></li><li><p>在 MySQL 中设置：</p><pre class="highlight"><code class="plain">ALTER USER 'snort'@'localhost' IDENTIFIED BY 'password' PASSWORD EXPIRE NEVER;
+ALTER USER 'snort'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
+FLUSH PRIVILEGES;
+</code></pre></li><li><p>重启 MySQL 服务：</p><pre class="highlight"><code class="plain">service mysql restart
+</code></pre></li></ul><p>可正常初始化配置：</p><img src="/assets/images/buaa-security/snort/install-10.png" width="85%"><h3 id="测试-snort-barnyard2-base"><a class="markdownIt-Anchor" href="#测试-snort-barnyard2-base"></a> 测试 Snort + Barnyard2 + BASE</h3><p>参考<a href="https://www.wangan.com/docs/1117">此文档</a>，在入侵检测模式下配置两条规则，分别检测大小异常的 ICMP 报文和 DoS 攻击：</p><pre class="highlight"><code class="plain">sudo gedit /etc/snort/rules/local.rules
+</code></pre><ul><li><p>具体配置为：</p><pre class="highlight"><code class="plain">alert icmp any any -&gt; $HOME_NET any (msg:&quot;ICMP pkt too big&quot;; classtype:icmp-event; dsize:&gt;200; sid:10000001; rev:001; GID:1; )
+alert tcp any any -&gt; $HOME_NET any (msg:&quot;flood attack&quot;; flags:S; threshold:type both,track by_dst,count 3,seconds 10; classtype:misc-attack; sid:10000003; rev:001; GID:1; )
+</code></pre></li></ul><p>在 Windows 物理机发送过大的 ICMP 报文：</p><img src="/assets/images/buaa-security/snort/test-1.jpg" width="70%"><p>在 Kali Linux 虚拟机发起 DoS 攻击：</p><img src="/assets/images/buaa-security/snort/test-2.png" width="85%"><p>在 BASE 中观察到上述攻击被检测：</p><img src="/assets/images/buaa-security/snort/test-3.png" width="85%"> <img src="/assets/images/buaa-security/snort/test-4.png" width="85%"></div><div>Word count: 2.2k</div><div>Reading time: 11min</div><div><div><a href="/archive/2022/05/1">Created 2022-05-28T10:33:47.000Z</a></div></div><div><div><a href="/archive/2022/05/1">Last Modified 2022-05-28T10:33:47.000Z</a></div></div><div><br><br></div></div></content><div><br></div><footer>Copyright © 2021-2023 Chenrt Blog</footer></noscript><div id="app"></div></body></html>
