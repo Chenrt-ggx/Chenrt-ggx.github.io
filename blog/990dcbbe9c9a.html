@@ -1,6 +1,22 @@
-<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 数据结构大作业性能优化总结</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/990dcbbe9c9a"><h1>数据结构大作业性能优化总结</h1></a><div><div><div><a href="/category/Buaa/1">Buaa</a></div><div><a href="/category/Buaa/DSP/1">DSP</a></div></div></div><div><div><div><a href="/tag/Algorithm/1">Algorithm</a></div><div><a href="/tag/C/1">C</a></div></div></div><div><p>[早期博客补档] | 以 2020 年数据结构大作业为例，本部分主要包括常数优化。</p><span id="more"></span><p>部分常数优化不具有工程性，仅适合极致追求性能的时候使用。<s>团队开发中这样写可能遭到围殴（逃</s></p><h2 id="常数优化"><a class="markdownIt-Anchor" href="#常数优化"></a> 常数优化</h2><h3 id="编译优化"><a class="markdownIt-Anchor" href="#编译优化"></a> 编译优化</h3><p>如下开启编译优化：</p><pre class="highlight"><code class="c"><span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(2)</span>
+<!DOCTYPE html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Chenrt"><meta name="keywords" content="Chenrt, @Chenrt, Chenrt Blog, 计算机, 网络安全, 博客, 个人网站"><meta name="description" content="Chenrt 的个人博客"><meta name="generator" content="Hexo"><link rel="icon" href="/favicon.svg"><title>Chenrt の 小窝 - 数据结构大作业性能优化总结</title><script defer="defer" src="/js/chunk-vendors.js"></script><script defer="defer" src="/js/app.js"></script><link href="/css/chunk-vendors.css" rel="stylesheet"><link href="/css/app.css" rel="stylesheet"></head><body><noscript><header><nav><a href="/">Home</a></nav><nav><a href="/blogs/1">Blogs</a></nav><nav><a href="/category">Categories</a></nav><nav><a href="/tag">Tags</a></nav><nav><a href="/archive">Archives</a></nav><nav><a href="/about">About</a></nav><nav><a href="/apis">Api</a></nav></header><div><br></div><content><div><a href="/blog/990dcbbe9c9a"><h1>数据结构大作业性能优化总结</h1></a><div><div><div><a href="/category/Buaa/1">Buaa</a></div><div><a href="/category/Buaa/DSP/1">DSP</a></div></div></div><div><div><div><a href="/tag/Algorithm/1">Algorithm</a></div><div><a href="/tag/C/1">C</a></div></div></div><div><p>[早期博客补档] | 以 2020 年数据结构大作业为例，本部分主要包括常数优化。</p><span id="more"></span><p>部分常数优化不具有工程性，仅适合极致追求性能的时候使用。<s>团队开发中这样写可能遭到围殴（逃</s></p><h2 id="常数优化"><a class="markdownIt-Anchor" href="#常数优化"></a> 常数优化</h2><h3 id="io-优化"><a class="markdownIt-Anchor" href="#io-优化"></a> IO 优化</h3><p>每次读入和输出需经历系统调用和进程切换的过程，时间开销较大，可通过在内存中维护 buffer 并使用 fread 和 fwrite 的方式一次性完成读入和输出，例如：</p><pre class="highlight"><code class="c">in = fopen(<span class="hljs-string">&quot;dictionary.txt&quot;</span>, <span class="hljs-string">&quot;rb&quot;</span>);
+n = fread(buffer, <span class="hljs-number">1</span>, <span class="hljs-number">10000000</span>, in);
+fclose(in);
+</code></pre><pre class="highlight"><code class="c">out = fopen(<span class="hljs-string">&quot;results.txt&quot;</span>, <span class="hljs-string">&quot;w&quot;</span>);
+<span class="hljs-built_in">fprintf</span>(out, <span class="hljs-string">&quot;%.5lf\n&quot;</span>, ans);
+fwrite(print, <span class="hljs-number">1</span>, tot, out);
+fclose(out);
+</code></pre><p>经测试该优化对程序性能的提升效果显著。</p><h3 id="单词单例存储"><a class="markdownIt-Anchor" href="#单词单例存储"></a> 单词单例存储</h3><p>如上所述，单词只存储一份值，并使用引用访问可以避免字符串复制，有效提高性能。结合 IO 优化可以得到一种高效实现单词只存储一份值的方式，buffer 切分：</p><ul><li>遍历 buffer，将字母之后不是字母的位置清零。</li><li>遍历 buffer，找出所有零和非零的分界点（开头部分需要特判），即得到所有单词。后续访问单词时，只要访问单词的地址（在 buffer 上的下标）。</li></ul><pre class="highlight"><code class="c">buffer[n] = i = <span class="hljs-number">0</span>;
+<span class="hljs-keyword">while</span> (buffer[i] &amp;&amp; !alpha[buffer[i]]) ++i;
+<span class="hljs-keyword">while</span> (buffer[i]) &#123;
+    pos = &amp;buffer[i];
+    <span class="hljs-keyword">while</span> (alpha[buffer[i]]) buffer[i++] |= <span class="hljs-number">32</span>;
+    buffer[i++] = <span class="hljs-number">0</span>;
+    ins(pos, <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">while</span> (buffer[i] &amp;&amp; !alpha[buffer[i]]) ++i;
+&#125;
+</code></pre><p>经测试该优化对程序性能的提升效果显著。</p><h3 id="编译优化"><a class="markdownIt-Anchor" href="#编译优化"></a> 编译优化</h3><p>在代码开头通过 pragma 开启 O2 和 O3 编译优化（吸氧）：</p><pre class="highlight"><code class="c"><span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(2)</span>
 <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(3,<span class="hljs-string">&quot;Ofast&quot;</span>,<span class="hljs-string">&quot;inline&quot;</span>)</span>
-</code></pre><p>在洛谷一些卡常题目的题解中，可以看到超长的编译优化：</p><pre class="highlight"><code class="c"><span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(1)</span>
+</code></pre><p>在洛谷一些卡常题目的题解中，可以发现更长的编译优化：</p><pre class="highlight"><code class="c"><span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(1)</span>
 <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(2)</span>
 <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(3)</span>
 <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(<span class="hljs-string">&quot;Ofast&quot;</span>)</span>
@@ -48,23 +64,7 @@
 <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(<span class="hljs-string">&quot;-funsafe-loop-optimizations&quot;</span>)</span>
 <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(<span class="hljs-string">&quot;inline-functions-called-once&quot;</span>)</span>
 <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> GCC optimize(<span class="hljs-string">&quot;-fdelete-null-pointer-checks&quot;</span>)</span>
-</code></pre><p>笔者本地的测试结果表明，后者的性能提升效果不超过评测机波动。</p><h3 id="io-优化"><a class="markdownIt-Anchor" href="#io-优化"></a> IO 优化</h3><p>每次读入和输出需经历系统调用和进程切换的过程，时间开销较大，可通过在内存中维护 buffer 并使用 fread 和 fwrite 的方式一次性完成读入和输出，例如：</p><pre class="highlight"><code class="c">in = fopen(<span class="hljs-string">&quot;dictionary.txt&quot;</span>, <span class="hljs-string">&quot;rb&quot;</span>);
-n = fread(buffer, <span class="hljs-number">1</span>, <span class="hljs-number">10000000</span>, in);
-fclose(in);
-</code></pre><pre class="highlight"><code class="c">out = fopen(<span class="hljs-string">&quot;results.txt&quot;</span>, <span class="hljs-string">&quot;w&quot;</span>);
-<span class="hljs-built_in">fprintf</span>(out, <span class="hljs-string">&quot;%.5lf\n&quot;</span>, ans);
-fwrite(print, <span class="hljs-number">1</span>, tot, out);
-fclose(out);
-</code></pre><p>经测试该优化对程序性能的提升效果显著。</p><h3 id="单词单例存储"><a class="markdownIt-Anchor" href="#单词单例存储"></a> 单词单例存储</h3><p>如上所述，单词只存储一份值，并使用引用访问可以避免字符串复制，有效提高性能。结合 IO 优化可以得到一种高效实现单词只存储一份值的方式，buffer 切分：</p><ul><li>遍历 buffer，将字母之后不是字母的位置清零。</li><li>遍历 buffer，找出所有零和非零的分界点（开头部分需要特判），即得到所有单词。后续访问单词时，只要访问单词的地址（在 buffer 上的下标）。</li></ul><pre class="highlight"><code class="c">buffer[n] = i = <span class="hljs-number">0</span>;
-<span class="hljs-keyword">while</span> (buffer[i] &amp;&amp; !alpha[buffer[i]]) ++i;
-<span class="hljs-keyword">while</span> (buffer[i]) &#123;
-    pos = &amp;buffer[i];
-    <span class="hljs-keyword">while</span> (alpha[buffer[i]]) buffer[i++] |= <span class="hljs-number">32</span>;
-    buffer[i++] = <span class="hljs-number">0</span>;
-    ins(pos, <span class="hljs-number">0</span>);
-    <span class="hljs-keyword">while</span> (buffer[i] &amp;&amp; !alpha[buffer[i]]) ++i;
-&#125;
-</code></pre><p>经测试该优化对程序性能的提升效果显著。</p><h3 id="低性能运算规避"><a class="markdownIt-Anchor" href="#低性能运算规避"></a> 低性能运算规避</h3><p>一般来说，乘除运算的开销大于加减运算，加减运算的开销大于位运算。可尽量使用开销低的运算方式，例如：</p><pre class="highlight"><code class="c">y = x * <span class="hljs-number">10</span>; <span class="hljs-comment">// 改为 y = (x &lt;&lt; 3) + (x &lt;&lt; 1)</span>
+</code></pre><p>经测试该优化对程序性能的提升效果中等；后者对程序性能的提升效果和前者相比不超过评测机波动。</p><h3 id="低性能运算规避"><a class="markdownIt-Anchor" href="#低性能运算规避"></a> 低性能运算规避</h3><p>一般来说，乘除运算的开销大于加减运算，加减运算的开销大于位运算。可尽量使用开销低的运算方式，例如：</p><pre class="highlight"><code class="c">y = x * <span class="hljs-number">10</span>; <span class="hljs-comment">// 改为 y = (x &lt;&lt; 3) + (x &lt;&lt; 1)</span>
 y = x / <span class="hljs-number">2</span>; <span class="hljs-comment">// 改为 y = x &gt;&gt; 1</span>
 y = x + <span class="hljs-string">&#x27;0&#x27;</span>; <span class="hljs-comment">// 改为 y = x ^ 48（数字转字符）</span>
 y = x - <span class="hljs-string">&#x27;0&#x27;</span>; <span class="hljs-comment">// 改为 y = x ^ 48（字符转数字）</span>
